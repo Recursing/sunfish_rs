@@ -121,6 +121,7 @@ impl Searcher {
                         // Save the move for pv construction and killer heuristic
                         self.move_transposition_table.put(hash, *m);
                         //println!("other: {}", best);
+                        break;
                     }
                 }
             }
