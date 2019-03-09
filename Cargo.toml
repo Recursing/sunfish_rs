@@ -1,0 +1,10 @@
+[package]
+name = "sunfish"
+version = "0.1.0"
+authors = ["Recursing <buonanno.lorenzo@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+lru = "0.1.12"
+lazy_static = "1.3.0"
+rand = "0.6.5"
