@@ -11,7 +11,7 @@ pub const MATE_UPPER: i32 = 60_000 + 10 * 929; // TODO move somewhere else, do w
 pub const MATE_LOWER: i32 = 60_000 - 10 * 929;
 const TRANSPOSITION_TABLE_SIZE: usize = 10_000_000; // TODO explain, TODO why does it use so much memory?? more than py?
 const QUIESCENCE_SEARCH_LIMIT: i32 = 150;
-const EVAL_ROUGHNESS: i32 = 20;
+const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 
 #[derive(Clone, Copy)]
 struct Entry {
@@ -83,7 +83,7 @@ impl Searcher {
         {
             let score = -self.bound(&nullmove(board_state), 1 - gamma, depth - 3, false);
             best = std::cmp::max(best, score);
-        } else {
+        } else if depth <= 0 {
             // For QSearch we have a different kind of null-move
             let score = board_state.score;
             best = std::cmp::max(best, score);
