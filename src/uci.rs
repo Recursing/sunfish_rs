@@ -35,7 +35,9 @@ pub fn uci_loop() {
                 if moves.len() == 2 && moves[1] != "startpos" {
                     writeln!(debug_file, "UNKNOWN FORMAT!");
                     panic!();
-                } else if moves[0] != "position" || moves[1] != "startpos" || moves[2] != "moves" {
+                } else if moves.len() > 2
+                    && (moves[0] != "position" || moves[1] != "startpos" || moves[2] != "moves")
+                {
                     writeln!(debug_file, "UNKNOWN FORMAT!");
                     panic!();
                 }
