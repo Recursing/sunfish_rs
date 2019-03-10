@@ -19,7 +19,7 @@ pub fn uci_loop() {
     let mut debug_file = File::create("debug_log").expect("Unable to create file!");
     println!("Sunfish_rs");
     let mut board_state = INITIAL_BOARD_STATE;
-    let mut rotated = false;
+    let mut am_black = false;
     loop {
         let next_command = read_line();
         writeln!(debug_file, "Received command {}", next_command);
@@ -42,10 +42,10 @@ pub fn uci_loop() {
                     panic!();
                 }
                 board_state = INITIAL_BOARD_STATE;
-                rotated = false;
+                am_black = false;
                 for move_ in moves.iter().skip(3) {
                     let mut parsed_move = parse_move(move_);
-                    if rotated {
+                    if am_black {
                         parsed_move.0 = BOARD_SIZE - 1 - parsed_move.0;
                         parsed_move.1 = BOARD_SIZE - 1 - parsed_move.1;
                     };
@@ -57,17 +57,39 @@ pub fn uci_loop() {
                         );
                     }
                     board_state = after_move(&board_state, &parsed_move);
-                    rotated = !rotated;
+                    am_black = !am_black;
                 }
+                // print_board(&board_state);
             }
             "go" => {
+                // go wtime 391360 btime 321390 winc 8000 binc 8000
+                let infos: Vec<&str> = next_command.split(" ").collect();
+                // Super basic time management
+                let time_for_move: u64 = if infos.len() < 9 {
+                    4_000_000_000
+                } else if am_black {
+                    (infos[4].parse::<u64>().expect("Failed to parse time")
+                        + infos[8].parse::<u64>().expect("Failed to parse time") * 30)
+                        * 1_000_000
+                        / 60
+                } else {
+                    (infos[2].parse::<u64>().expect("Failed to parse time")
+                        + infos[6].parse::<u64>().expect("Failed to parse time") * 30)
+                        * 1_000_000
+                        / 60
+                };
                 writeln!(debug_file, "Computing move!");
                 // TODO parse_movetime
-                let (mut top_move, _score) =
-                    searcher.search(board_state.clone(), Duration::new(1, 0));
+                let (mut top_move, _score) = searcher.search(
+                    board_state.clone(),
+                    Duration::new(
+                        time_for_move / 1_000_000_000,
+                        (time_for_move % 1_000_000_000) as u32,
+                    ),
+                );
                 let is_promotion = (A8 <= top_move.1 && top_move.1 <= H8)
                     && board_state.board[top_move.0] == Square::MyPiece(Piece::Pawn);
-                if rotated {
+                if am_black {
                     top_move.0 = BOARD_SIZE - 1 - top_move.0;
                     top_move.1 = BOARD_SIZE - 1 - top_move.1;
                 };
@@ -89,6 +111,13 @@ pub fn uci_loop() {
                     "Sending bestmove {}{}",
                     render(top_move.0),
                     render(top_move.1)
+                );
+                writeln!(
+                    debug_file,
+                    "Searched {} nodes, tables at {} and {}",
+                    searcher.nodes,
+                    searcher.move_transposition_table.len(),
+                    searcher.score_transposition_table.len()
                 );
             }
             _ => {
