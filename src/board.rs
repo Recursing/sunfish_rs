@@ -247,7 +247,8 @@ pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardStat
         }
 
         // en passant capture (diagonal move to empty position)
-        if (move_type.abs() % Direction::SOUTH != 0) && new_board[end_position] == Square::Empty {
+        // TODO remove hack
+        if end_position == board_state.en_passant_position.unwrap_or(0) {
             new_board[end_position + Direction::SOUTH as usize] = Square::Empty;
         }
     }
