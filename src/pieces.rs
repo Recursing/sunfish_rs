@@ -27,7 +27,7 @@ pub enum Square {
     MyPiece(Piece),
     OpponentPiece(Piece),
     Empty,
-    Wall, // Simplify detection of out of board moves
+    Wall, // Here to simplify detection of out of board moves
 }
 
 lazy_static! {

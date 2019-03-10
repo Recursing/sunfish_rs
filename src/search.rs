@@ -9,12 +9,12 @@ use lru::LruCache;
 
 pub const MATE_UPPER: i32 = 60_000 + 10 * 929; // TODO move somewhere else, do we need MATE_UPPER?
 pub const MATE_LOWER: i32 = 60_000 - 10 * 929;
-const TRANSPOSITION_TABLE_SIZE: usize = 10_000_000; // TODO explain, TODO why does it use so much memory?? more than py?
+const TRANSPOSITION_TABLE_SIZE: usize = 50_000_000; // TODO explain, TODO why does it use so much memory?? more than py? TODO does realistically get filled? can we use just a normal hashtable?
 const QUIESCENCE_SEARCH_LIMIT: i32 = 150;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 
 #[derive(Clone, Copy)]
-struct Entry {
+pub struct Entry { // pub for debugging TODO refactor
     lower: i32,
     upper: i32,
 }
@@ -25,9 +25,9 @@ const DEFAULT_ENTRY: Entry = Entry {
 };
 
 pub struct Searcher {
-    score_transposition_table: LruCache<(u64, i32, bool), Entry>,
-    move_transposition_table: LruCache<u64, (usize, usize)>,
-    nodes: u32,
+    pub score_transposition_table: LruCache<(u64, i32, bool), Entry>,
+    pub move_transposition_table: LruCache<u64, (usize, usize)>,
+    pub nodes: u32,
 }
 impl Searcher {
     pub fn new() -> Searcher {
@@ -182,7 +182,7 @@ impl Searcher {
         let now = Instant::now();
 
         // Bound depth to avoid infinite recursion in finished games
-        for _depth in 1..999 {
+        for _depth in 1..99 { // Realistically will reach depths around 8-13
             depth = _depth;
             let mut lower = -MATE_UPPER;
             let mut upper = MATE_UPPER;
@@ -199,7 +199,7 @@ impl Searcher {
             //println!("Reached depth {}", depth);
             //println!("Examined nodes {}", self.nodes);
             //println!("Searched for {:?}", now.elapsed());
-            if now.elapsed() > duration {
+            if now.elapsed() > duration || _score > MATE_LOWER { // Don't waste time if a mate is found
                 break;
             }
         }
