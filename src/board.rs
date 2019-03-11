@@ -16,7 +16,7 @@ pub struct BoardState {
     pub my_castling_rights: (bool, bool), // first west, second east
     pub opponent_castling_rights: (bool, bool), // first west, second east
     pub en_passant_position: Option<usize>, // square where I can en passant
-    king_passant_position: Option<usize>, // square where I could capture the king, used to treat castling as en passant
+    pub king_passant_position: Option<usize>, // square where I could capture the king, used to treat castling as en passant
 }
 
 pub fn zobrist_hash(board_state: &BoardState) -> u64 {
@@ -308,10 +308,8 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
     temp_score
 }
 
-#[allow(dead_code)]
-pub fn static_score(board_state: &BoardState) -> i32 {
-    board_state
-        .board
+pub fn static_score(board: [Square; BOARD_SIZE]) -> i32 {
+    board
         .iter()
         .enumerate()
         .map(|(index, piece)| match piece {

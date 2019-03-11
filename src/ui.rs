@@ -1,59 +1,8 @@
-use crate::board::{static_score, BoardState, A1, A8, BOARD_SIDE, PADDING};
-use crate::pieces::{Piece, Square};
-use lazy_static::lazy_static;
+use std::char::from_digit;
 use std::collections::HashMap;
 
-lazy_static! {
-    static ref UNI_PIECES: HashMap<Square, char> = {
-        let mut h = HashMap::new();
-        h.insert(Square::MyPiece(Piece::Rook), '♜');
-        h.insert(Square::MyPiece(Piece::Knight), '♞');
-        h.insert(Square::MyPiece(Piece::Bishop), '♝');
-        h.insert(Square::MyPiece(Piece::Queen), '♛');
-        h.insert(Square::MyPiece(Piece::King), '♚');
-        h.insert(Square::MyPiece(Piece::Pawn), '♟');
-        h.insert(Square::OpponentPiece(Piece::Rook), '♖');
-        h.insert(Square::OpponentPiece(Piece::Knight), '♘');
-        h.insert(Square::OpponentPiece(Piece::Bishop), '♗');
-        h.insert(Square::OpponentPiece(Piece::Queen), '♕');
-        h.insert(Square::OpponentPiece(Piece::King), '♔');
-        h.insert(Square::OpponentPiece(Piece::Pawn), '♙');
-        h.insert(Square::Empty, '·');
-        h
-    };
-}
-
-#[allow(dead_code)]
-pub fn print_board(board_state: &BoardState) {
-    for (i, row) in board_state
-        .board
-        .chunks(BOARD_SIDE)
-        .skip(PADDING)
-        .take(8)
-        .enumerate()
-    {
-        print!(" {} ", 8 - i);
-        for p in row.iter().skip(PADDING).take(8) {
-            print!(" {}", UNI_PIECES.get(p).unwrap());
-        }
-        println!();
-    }
-    println!("    a b c d e f g h \n\n");
-    println!("Static score: {}", board_state.score);
-    if static_score(board_state) != board_state.score {
-        println!(
-            "STATIC SCORE ERROR, SHOULD BE: {}",
-            static_score(board_state)
-        );
-    }
-    if board_state.en_passant_position.is_some() {
-        println!("En passant is {:?}", board_state.en_passant_position);
-    }
-    println!(
-        "Castling rights are {:?} {:?}",
-        board_state.my_castling_rights, board_state.opponent_castling_rights
-    )
-}
+use crate::board::{rotated, static_score, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING};
+use crate::pieces::{Piece, Square};
 
 pub fn parse_move(move_: &str) -> (usize, usize) {
     let from = parse_coordinates(&move_[..2]);
@@ -61,7 +10,7 @@ pub fn parse_move(move_: &str) -> (usize, usize) {
     (from, to)
 }
 
-fn parse_coordinates(coordinates: &str) -> usize {
+pub fn parse_coordinates(coordinates: &str) -> usize {
     let mut chars = coordinates.chars();
     let file = chars.next().expect("Failed to parse coordinates");
     let rank = chars.next().expect("Failed to parse coordinates");
@@ -69,8 +18,126 @@ fn parse_coordinates(coordinates: &str) -> usize {
         - BOARD_SIDE as usize * ((rank as i32 - '1' as i32) as usize)
 }
 
-pub fn render(move_: usize) -> String {
+pub fn render_coordinates(move_: usize) -> String {
     let rank = b'8' - ((move_ - A8) as u8 / BOARD_SIDE as u8);
     let file = (move_ - A8) as u8 % BOARD_SIDE as u8 + b'a';
     [file as char, rank as char].iter().collect()
+}
+
+pub fn render_board(board_state: &BoardState) -> String {
+    let mut uni_pieces = HashMap::new();
+    uni_pieces.insert(Square::MyPiece(Piece::Rook), '♜');
+    uni_pieces.insert(Square::MyPiece(Piece::Knight), '♞');
+    uni_pieces.insert(Square::MyPiece(Piece::Bishop), '♝');
+    uni_pieces.insert(Square::MyPiece(Piece::Queen), '♛');
+    uni_pieces.insert(Square::MyPiece(Piece::King), '♚');
+    uni_pieces.insert(Square::MyPiece(Piece::Pawn), '♟');
+    uni_pieces.insert(Square::OpponentPiece(Piece::Rook), '♖');
+    uni_pieces.insert(Square::OpponentPiece(Piece::Knight), '♘');
+    uni_pieces.insert(Square::OpponentPiece(Piece::Bishop), '♗');
+    uni_pieces.insert(Square::OpponentPiece(Piece::Queen), '♕');
+    uni_pieces.insert(Square::OpponentPiece(Piece::King), '♔');
+    uni_pieces.insert(Square::OpponentPiece(Piece::Pawn), '♙');
+    uni_pieces.insert(Square::Empty, '·');
+    let mut rendered_board: String = String::from("");
+
+    for (i, row) in board_state
+        .board
+        .chunks(BOARD_SIDE)
+        .skip(PADDING)
+        .take(8)
+        .enumerate()
+    {
+        rendered_board.push_str(&format!(" {} ", 8 - i));
+        for p in row.iter().skip(PADDING).take(8) {
+            rendered_board.push_str(&format!(" {}", uni_pieces[p]));
+        }
+        rendered_board.push_str("\n");
+    }
+    rendered_board.push_str("    a b c d e f g h \n\n");
+    rendered_board.push_str(&format!("Static score: {}\n", board_state.score));
+    if static_score(board_state.board) != board_state.score {
+        rendered_board.push_str(&format!(
+            "STATIC SCORE ERROR, SHOULD BE: {}\n",
+            static_score(board_state.board),
+        ));
+    }
+    if board_state.en_passant_position.is_some() {
+        rendered_board.push_str(&format!(
+            "En passant is {:?}\n",
+            board_state.en_passant_position
+        ));
+    }
+    rendered_board.push_str(&format!(
+        "Castling rights are {:?} {:?}\n",
+        board_state.my_castling_rights, board_state.opponent_castling_rights,
+    ));
+    rendered_board
+}
+
+// https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation#Definition
+pub fn from_fen(fen: &str) -> BoardState {
+    let mut new_board = [Square::Empty; BOARD_SIZE];
+    let fields = fen.split(' ').collect::<Vec<_>>();
+    let mut board_string: String = fields[0].into();
+    let (turn, castling, en_passant, _halfmoves, _fullmoves) =
+        (fields[1], fields[2], fields[3], fields[4], fields[5]);
+    for d in 1..9 {
+        board_string = board_string.replace(from_digit(d, 10).unwrap(), &"_".repeat(d as usize));
+    }
+    let board_lines: Vec<Vec<char>> = board_string
+        .split('/')
+        .map(|s| s.chars().collect())
+        .collect();
+    for rank in 0..BOARD_SIDE {
+        for file in 0..BOARD_SIDE {
+            let position = rank * BOARD_SIDE + file;
+            new_board[position] = if rank < PADDING
+                || file < PADDING
+                || BOARD_SIDE - rank <= PADDING
+                || BOARD_SIDE - file <= PADDING
+            {
+                Square::Wall
+            } else {
+                match board_lines[rank - PADDING][file - PADDING] {
+                    'P' => Square::MyPiece(Piece::Pawn),
+                    'N' => Square::MyPiece(Piece::Knight),
+                    'B' => Square::MyPiece(Piece::Bishop),
+                    'R' => Square::MyPiece(Piece::Rook),
+                    'Q' => Square::MyPiece(Piece::Queen),
+                    'K' => Square::MyPiece(Piece::King),
+                    'p' => Square::OpponentPiece(Piece::Pawn),
+                    'n' => Square::OpponentPiece(Piece::Knight),
+                    'b' => Square::OpponentPiece(Piece::Bishop),
+                    'r' => Square::OpponentPiece(Piece::Rook),
+                    'q' => Square::OpponentPiece(Piece::Queen),
+                    'k' => Square::OpponentPiece(Piece::King),
+                    _ => Square::Empty,
+                }
+            }
+        }
+    }
+
+    let en_passant_position = if en_passant == "-" {
+        None
+    } else {
+        Some(parse_coordinates(en_passant))
+    };
+
+    let my_castling_rights = (castling.contains('Q'), castling.contains('K'));
+    let opponent_castling_rights = (castling.contains('k'), castling.contains('q'));
+
+    let boardstate = BoardState {
+        board: new_board,
+        score: static_score(new_board),
+        my_castling_rights,
+        opponent_castling_rights,
+        en_passant_position,
+        king_passant_position: None, // is not useful for legal board states
+    };
+    if turn == "w" {
+        boardstate
+    } else {
+        rotated(&boardstate)
+    }
 }
