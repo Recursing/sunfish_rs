@@ -3,8 +3,6 @@ use crate::pieces::{Piece, Square};
 use std::cmp::max;
 use std::time::{Duration, Instant};
 
-extern crate lru;
-
 use lru::LruCache;
 
 pub const MATE_UPPER: i32 = 60_000 + 10 * 929; // TODO move somewhere else, do we need MATE_UPPER?

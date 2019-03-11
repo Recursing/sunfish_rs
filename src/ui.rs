@@ -1,5 +1,6 @@
 use crate::board::{static_score, BoardState, A1, A8, BOARD_SIDE, PADDING};
 use crate::pieces::{Piece, Square};
+use lazy_static::lazy_static;
 use std::collections::HashMap;
 
 lazy_static! {
