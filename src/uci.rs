@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::board::{after_move, gen_moves, A8, BOARD_SIZE, H8, INITIAL_BOARD_STATE};
 use crate::pieces::{Piece, Square};
 use crate::search::Searcher;
-use crate::ui::{parse_move, render};
+use crate::ui::{parse_move, render_coordinates};
 
 fn read_line() -> String {
     let mut line = String::new();
@@ -64,7 +64,7 @@ pub fn uci_loop() {
 
                 // Command format is going to be:
                 // go wtime 391360 btime 321390 winc 8000 binc 8000
-                let infos: Vec<&str> = next_command.split(" ").collect();
+                let infos: Vec<&str> = next_command.split(' ').collect();
                 let average_remaining_moves = 30;
                 // Super basic time management
                 let total_available_time: u64 = if infos.len() < 9 {
@@ -80,8 +80,8 @@ pub fn uci_loop() {
                 };
 
                 let mut nanos_for_move: u64 =
-                    total_available_time * 1_000_000 / average_remaining_moves;
-                if nanos_for_move > 1000_000_000 {
+                    total_available_time * 1_000_000 / average_remaining_moves / 2;
+                if nanos_for_move > 1_000_000_000 {
                     nanos_for_move -= 500_000_000 // Account for lag
                 } else {
                     nanos_for_move = 200_000_000 // Minimum reasonable move time
@@ -91,7 +91,11 @@ pub fn uci_loop() {
                     nanos_for_move / 1_000_000_000,
                     (nanos_for_move % 1_000_000_000) as u32,
                 );
-                info!("Computing move! {:?}", time_for_move);
+                info!(
+                    "Computing move giving time {:?} with {}s remaining",
+                    time_for_move,
+                    total_available_time / 1000
+                );
                 // TODO parse_movetime
                 let (mut top_move, _score, _depth) =
                     searcher.search(board_state.clone(), time_for_move);
@@ -104,20 +108,20 @@ pub fn uci_loop() {
                 if is_promotion {
                     println!(
                         "bestmove {}{}q ponder e7e5",
-                        render(top_move.0),
-                        render(top_move.1)
+                        render_coordinates(top_move.0),
+                        render_coordinates(top_move.1)
                     );
                 } else {
                     println!(
                         "bestmove {}{} ponder e7e5",
-                        render(top_move.0),
-                        render(top_move.1)
+                        render_coordinates(top_move.0),
+                        render_coordinates(top_move.1)
                     );
                 }
                 info!(
                     "Sending bestmove {}{}",
-                    render(top_move.0),
-                    render(top_move.1)
+                    render_coordinates(top_move.0),
+                    render_coordinates(top_move.1)
                 );
                 info!(
                     "Searched {} nodes, reached depth {}, estimate score {}, tables at {} and {}",

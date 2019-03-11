@@ -35,6 +35,8 @@ lazy_static! {
     pub static ref PIECE_MOVES: HashMap<Piece, Vec<i32>> = get_piece_moves();
     pub static ref PIECE_SQUARE_TABLES: HashMap<Piece, [i32; BOARD_SIZE]> =
         get_piece_square_tables();
+
+    // See https://en.wikipedia.org/wiki/Zobrist_hashing
     pub static ref ZOBRIST_MAP: HashMap<(usize, Square), u64> = get_zobrist_map();
 }
 
