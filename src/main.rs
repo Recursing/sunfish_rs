@@ -1,3 +1,8 @@
+use jemallocator::Jemalloc;
+
+#[global_allocator]
+static ALLOC: Jemalloc = Jemalloc;
+
 use simplelog::{Config, LevelFilter, WriteLogger};
 use std::fs::OpenOptions;
 
