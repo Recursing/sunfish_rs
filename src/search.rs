@@ -1,9 +1,11 @@
-use crate::board::{after_move, gen_moves, move_value, nullmove, zobrist_hash, BoardState};
-use crate::pieces::{Piece, Square};
+use log::trace;
 use std::cmp::max;
 use std::time::{Duration, Instant};
 
 use lru::LruCache;
+
+use crate::board::{after_move, gen_moves, move_value, nullmove, zobrist_hash, BoardState};
+use crate::pieces::{Piece, Square};
 
 pub const MATE_UPPER: i32 = 60_000 + 10 * 929; // TODO move somewhere else, do we need MATE_UPPER?
 pub const MATE_LOWER: i32 = 60_000 - 10 * 929;
@@ -200,9 +202,12 @@ impl Searcher {
                 }
             }
             let _score = self.bound(&board_state, lower, depth, true);
-            //println!("Reached depth {}", depth);
-            //println!("Examined nodes {}", self.nodes);
-            //println!("Searched for {:?}", now.elapsed());
+            trace!(
+                "Reached depth {} nodes {} time {:?}",
+                depth,
+                self.nodes,
+                now.elapsed()
+            );
             if now.elapsed() > duration || _score > MATE_LOWER {
                 // Don't waste time if a mate is found
                 break;
@@ -231,8 +236,6 @@ impl Searcher {
         for depth in 1..30 {
             self.score_transposition_table
                 .put((hash, depth, false), Entry { lower: 0, upper: 0 });
-            self.score_transposition_table
-                .put((hash, depth, true), Entry { lower: 0, upper: 0 });
         }
     }
 }

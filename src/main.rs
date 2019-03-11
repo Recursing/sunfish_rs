@@ -1,3 +1,6 @@
+use simplelog::{Config, LevelFilter, WriteLogger};
+use std::fs::OpenOptions;
+
 mod board;
 mod pieces;
 mod search;
@@ -8,7 +11,17 @@ mod ui;
 use crate::uci::uci_loop;
 //use crate::ui::{parse_move, print_board, render};
 
+fn set_global_logger() {
+    let file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("sunfish_log.log")
+        .unwrap();
+    let _ = WriteLogger::init(LevelFilter::Trace, Config::default(), file);
+}
+
 fn main() {
+    set_global_logger();
     uci_loop();
     /*let mut board_state = INITIAL_BOARD_STATE;
     let mut searcher = Searcher::new();

@@ -1,5 +1,4 @@
-use std::fs::File;
-use std::io::Write;
+use log::{info, trace, warn};
 use std::time::Duration;
 
 use crate::board::{after_move, gen_moves, A8, BOARD_SIZE, H8, INITIAL_BOARD_STATE};
@@ -16,13 +15,12 @@ fn read_line() -> String {
 
 pub fn uci_loop() {
     let mut searcher = Searcher::new();
-    let mut debug_file = File::create("debug_log").expect("Unable to create file!");
     println!("Sunfish_rs");
     let mut board_state = INITIAL_BOARD_STATE;
     let mut am_black = false;
     loop {
         let next_command = read_line();
-        writeln!(debug_file, "Received command {}", next_command).unwrap();
+        trace!("Received command {}", next_command);
         match next_command.split(' ').next().unwrap() {
             "quit" => return,
             "uci" => println!("uciok"),
@@ -30,15 +28,15 @@ pub fn uci_loop() {
             "ucinewgame" => board_state = INITIAL_BOARD_STATE,
             "position" => {
                 //position startpos moves d2d4 d7d5 e2e4 d5e4
-                writeln!(debug_file, "loading moves").unwrap();
+                info!("loading moves");
                 let moves: Vec<&str> = next_command.split(' ').collect();
                 if moves.len() == 2 && moves[1] != "startpos" {
-                    writeln!(debug_file, "UNKNOWN FORMAT!").unwrap();
+                    warn!("UNKNOWN FORMAT!");
                     panic!();
                 } else if moves.len() > 2
                     && (moves[0] != "position" || moves[1] != "startpos" || moves[2] != "moves")
                 {
-                    writeln!(debug_file, "UNKNOWN FORMAT!").unwrap();
+                    warn!("UNKNOWN FORMAT!");
                     panic!();
                 }
                 board_state = INITIAL_BOARD_STATE;
@@ -50,12 +48,10 @@ pub fn uci_loop() {
                         parsed_move.1 = BOARD_SIZE - 1 - parsed_move.1;
                     };
                     if !gen_moves(&board_state).contains(&parsed_move) {
-                        writeln!(
-                            debug_file,
+                        warn!(
                             "Trying to make an illegal move {:?}, will probably fail",
                             parsed_move
-                        )
-                        .unwrap();
+                        );
                     }
                     board_state = after_move(&board_state, &parsed_move);
                     searcher.set_eval_to_zero(&board_state);
@@ -83,22 +79,22 @@ pub fn uci_loop() {
                             * average_remaining_moves
                 };
 
-                let mut time_for_move: u64 =
+                let mut nanos_for_move: u64 =
                     total_available_time * 1_000_000 / average_remaining_moves;
-                if time_for_move > 1000_000_000 {
-                    time_for_move -= 500_000_000 // Account for lag
+                if nanos_for_move > 1000_000_000 {
+                    nanos_for_move -= 500_000_000 // Account for lag
                 } else {
-                    time_for_move = 10_000_000 // Minimum reasonable move time
+                    nanos_for_move = 200_000_000 // Minimum reasonable move time
                 }
-                writeln!(debug_file, "Computing move!").unwrap();
-                // TODO parse_movetime
-                let (mut top_move, _score, _depth) = searcher.search(
-                    board_state.clone(),
-                    Duration::new(
-                        time_for_move / 1_000_000_000,
-                        (time_for_move % 1_000_000_000) as u32,
-                    ),
+
+                let time_for_move = Duration::new(
+                    nanos_for_move / 1_000_000_000,
+                    (nanos_for_move % 1_000_000_000) as u32,
                 );
+                info!("Computing move! {:?}", time_for_move);
+                // TODO parse_movetime
+                let (mut top_move, _score, _depth) =
+                    searcher.search(board_state.clone(), time_for_move);
                 let is_promotion = (A8 <= top_move.1 && top_move.1 <= H8)
                     && board_state.board[top_move.0] == Square::MyPiece(Piece::Pawn);
                 if am_black {
@@ -118,24 +114,22 @@ pub fn uci_loop() {
                         render(top_move.1)
                     );
                 }
-                writeln!(
-                    debug_file,
+                info!(
                     "Sending bestmove {}{}",
                     render(top_move.0),
                     render(top_move.1)
-                ).unwrap();
-                writeln!(
-                    debug_file,
+                );
+                info!(
                     "Searched {} nodes, reached depth {}, estimate score {}, tables at {} and {}",
                     searcher.nodes,
                     _depth,
                     _score,
                     searcher.move_transposition_table.len(),
                     searcher.score_transposition_table.len()
-                ).unwrap();
+                );
             }
             _ => {
-                writeln!(debug_file, "UNKNOWN COMMAND {}", next_command).unwrap();
+                warn!("UNKNOWN COMMAND {}", next_command);
                 println!("Unknown command:{}", next_command);
             }
         }
