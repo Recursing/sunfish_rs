@@ -175,14 +175,18 @@ impl Searcher {
     }
 
     // Iterative deepening MTD-bi search
-    pub fn search(&mut self, board_state: BoardState, duration: Duration) -> ((usize, usize), i32) {
+    pub fn search(
+        &mut self,
+        board_state: BoardState,
+        duration: Duration,
+    ) -> ((usize, usize), i32, i32) {
         self.nodes = 0;
         let hash = zobrist_hash(&board_state);
         let mut depth = 0;
         let now = Instant::now();
 
         // Bound depth to avoid infinite recursion in finished games
-        for _depth in 1..99 { // Realistically will reach depths around 8-13
+        for _depth in 1..99 { // Realistically will reach depths around 6-20
             depth = _depth;
             let mut lower = -MATE_UPPER;
             let mut upper = MATE_UPPER;
@@ -215,6 +219,19 @@ impl Searcher {
                 .get(&(hash, depth, true))
                 .expect("score not in table")
                 .lower,
+            depth,
         );
+    }
+
+    // Done to prevent move repetitions
+    pub fn set_eval_to_zero(&mut self, board_state: &BoardState) {
+        let hash = zobrist_hash(board_state);
+        // TODO there's probably a better way
+        for depth in 1..30 {
+            self.score_transposition_table
+                .put((hash, depth, false), Entry { lower: 0, upper: 0 });
+            self.score_transposition_table
+                .put((hash, depth, true), Entry { lower: 0, upper: 0 });
+        }
     }
 }
