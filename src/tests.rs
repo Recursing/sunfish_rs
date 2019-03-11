@@ -1,5 +1,7 @@
 use crate::board::{after_move, gen_moves, zobrist_hash, INITIAL_BOARD_STATE};
-use crate::ui::{from_fen, parse_move, render_board, render_coordinates};
+use crate::search::{Searcher, MATE_LOWER};
+use crate::ui::{from_fen, parse_move, render_board, render_move};
+use std::time::{Duration, Instant};
 
 pub fn tests() -> bool {
     // Test FEN loading is coerent with move making
@@ -105,17 +107,13 @@ pub fn tests() -> bool {
             move_list,
             gen_moves(&board_state)
                 .iter()
-                .map(|(from, to)| format!(
-                    "{}{}",
-                    render_coordinates(*from),
-                    render_coordinates(*to)
-                ))
+                .map(render_move)
                 .collect::<Vec<_>>()
         );
         board_state = after_move(&board_state, &parse_move(next_move));
     }
 
-    let fens = vec![
+    let move_fens = vec![
         "r1b1k2r/3n1p1p/p2PpnpR/qpp1p3/5P2/2N5/PPPQB1P1/1K1R2N1 w kq - 0 16",
         "7k/7p/8/1p5R/1P6/2Pb4/1r4PK/8 w - - 1 42",
         "8/5p1p/2p1p1pk/4Q3/7P/5qP1/r4P2/2R3K1 b - - 0 34",
@@ -169,20 +167,66 @@ pub fn tests() -> bool {
         ],
     ];
 
-    for (fen, movelist) in fens.iter().zip(possible_moves) {
+    for (fen, movelist) in move_fens.iter().zip(possible_moves) {
         board_state = from_fen(fen);
         assert_eq!(
             movelist,
             gen_moves(&board_state)
                 .iter()
-                .map(|(from, to)| format!(
-                    "{}{}",
-                    render_coordinates(*from),
-                    render_coordinates(*to)
-                ))
+                .map(render_move)
                 .collect::<Vec<_>>(),
         );
     }
+
+    // Since search exits early on mate found, can be used for benchmarking
+    let mate_fens = vec![
+        "1r1r1n1k/4qpnP/p1b1p1pQ/P2pP1N1/2pP2P1/1pP5/1P3PK1/RB5R w - - 7 31",
+        "r5qr/p1R1B1p1/Q3p3/4Pp2/4n1k1/1P2P1Pp/P4P1P/5RK1 w - - 3 22",
+        "r5qr/p1R1B3/4p1k1/4P1p1/4pR2/1P2P1Pp/P3Q2P/6K1 w - - 2 26",
+        "2b1r1k1/5p2/1pp4Q/4p3/6p1/r2B1P2/2P3PP/q1B1K1NR w K - 0 22",
+        "r1bq1b1r/ppp4p/2n3p1/4p3/3Pp3/4B1P1/PPP1QP1P/R3K2k w Q - 0 15",
+        "2kr1b1r/R3qp1p/bQ5p/2Pp4/3P4/5N2/5PPP/5K1R w - - 0 20",
+        "r2qkb1r/ppp2ppp/2n2n2/8/2BP1P2/1Q3b2/PP4PP/RNB1K2R w KQkq - 0 9",
+        "3N4/p6k/b3N1pp/3pp3/R4p2/7P/P1r3PB/6K1 b - - 1 34",
+        "2rR4/p4k2/1p2p2Q/5p2/5P2/8/PPP3q1/1KB4R b - - 0 27",
+    ];
+
+    let mate_solutions = vec![
+        "h6g7", "a6e2", "f4f6", "d3h7", "e2f1", "b6a6", "c4f7", "f7f8", "b7f7",
+    ];
+
+    let time_for_mate = Duration::new(10, 0); // Max time to solve, should take much less N.B. compile as --release
+
+    let mates_start_time = Instant::now();
+    for (puzzle, solution) in mate_fens.iter().zip(mate_solutions) {
+        let mut searcher = Searcher::new();
+        println!("{}", render_board(&from_fen(puzzle)));
+        let (top_move, score, _depth) = searcher.search(from_fen(puzzle), time_for_mate);
+        assert_eq!(render_move(&top_move), solution);
+        assert!(score > MATE_LOWER);
+    }
+    println!(
+        "mates solved in {:?}, should take less than 5s",
+        mates_start_time.elapsed()
+    );
+
+    let puzzle_fens = vec![
+        "r2q1rk1/1p3ppp/p2bb3/3pn3/8/P1N1Q3/1PP1BPPP/R1B2RK1 b - - 9 16",
+        "r5k1/1q3ppp/4p3/2p1P3/N7/2P5/P1R1QPPP/6K1 b - - 0 27",
+        "r3r1k1/pp1n2p1/2pq2p1/3p1p2/3P4/1NP2PnP/PP4P1/R1Q1RNK1 b - - 2 22",
+        "r3k2r/1p3ppp/1qnbpn2/pP1p4/3P1P2/2PB1Q2/P2N2PP/R1B2RK1 b kq - 0 12",
+        "r1bq1rk1/1p3pp1/p2p1n1p/2b1p3/2PnP3/P1NB4/1P1QNPPP/R1B2RK1 b - - 0 12",
+    ];
+
+    let puzzle_solutions = vec!["e4e5", "g2g8", "b6d7", "f3e5", "e5g6"];
+
+    let time_for_puzzle = Duration::new(1, 0);
+    for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
+        let mut searcher = Searcher::new();
+        let (top_move, _score, _depth) = searcher.search(from_fen(puzzle), time_for_puzzle);
+        assert_eq!(render_move(&top_move), solution);
+    }
+    println!("Puzzles solved");
 
     true
 }
