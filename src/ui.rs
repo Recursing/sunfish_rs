@@ -22,6 +22,7 @@ lazy_static! {
     };
 }
 
+#[allow(dead_code)]
 pub fn print_board(board_state: &BoardState) {
     for (i, row) in board_state
         .board
@@ -34,7 +35,7 @@ pub fn print_board(board_state: &BoardState) {
         for p in row.iter().skip(PADDING).take(8) {
             print!(" {}", UNI_PIECES.get(p).unwrap());
         }
-        print!("\n");
+        println!();
     }
     println!("    a b c d e f g h \n\n");
     println!("Static score: {}", board_state.score);
@@ -63,12 +64,12 @@ fn parse_coordinates(coordinates: &str) -> usize {
     let mut chars = coordinates.chars();
     let file = chars.next().expect("Failed to parse coordinates");
     let rank = chars.next().expect("Failed to parse coordinates");
-    return A1 + (file as i32 - 'a' as i32) as usize
-        - BOARD_SIDE as usize * ((rank as i32 - '1' as i32) as usize);
+    A1 + (file as i32 - 'a' as i32) as usize
+        - BOARD_SIDE as usize * ((rank as i32 - '1' as i32) as usize)
 }
 
 pub fn render(move_: usize) -> String {
     let rank = b'8' - ((move_ - A8) as u8 / BOARD_SIDE as u8);
     let file = (move_ - A8) as u8 % BOARD_SIDE as u8 + b'a';
-    return vec![file as char, rank as char].into_iter().collect();
+    [file as char, rank as char].iter().collect()
 }
