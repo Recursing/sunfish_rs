@@ -57,30 +57,41 @@ pub fn uci_loop() {
                         );
                     }
                     board_state = after_move(&board_state, &parsed_move);
+                    searcher.set_eval_to_zero(&board_state);
                     am_black = !am_black;
                 }
                 // print_board(&board_state);
             }
             "go" => {
+                // TODO: refactor time management
+
+                // Command format is going to be:
                 // go wtime 391360 btime 321390 winc 8000 binc 8000
                 let infos: Vec<&str> = next_command.split(" ").collect();
+                let average_remaining_moves = 30;
                 // Super basic time management
-                let time_for_move: u64 = if infos.len() < 9 {
-                    4_000_000_000
+                let total_available_time: u64 = if infos.len() < 9 {
+                    4_000 * average_remaining_moves
                 } else if am_black {
-                    (infos[4].parse::<u64>().expect("Failed to parse time")
-                        + infos[8].parse::<u64>().expect("Failed to parse time") * 30)
-                        * 1_000_000
-                        / 60
+                    infos[4].parse::<u64>().expect("Failed to parse time")
+                        + infos[8].parse::<u64>().expect("Failed to parse time")
+                            * average_remaining_moves
                 } else {
-                    (infos[2].parse::<u64>().expect("Failed to parse time")
-                        + infos[6].parse::<u64>().expect("Failed to parse time") * 30)
-                        * 1_000_000
-                        / 60
+                    infos[2].parse::<u64>().expect("Failed to parse time")
+                        + infos[6].parse::<u64>().expect("Failed to parse time")
+                            * average_remaining_moves
                 };
+
+                let mut time_for_move: u64 =
+                    total_available_time * 1_000_000 / average_remaining_moves;
+                if time_for_move > 1000_000_000 {
+                    time_for_move -= 500_000_000 // Account for lag
+                } else {
+                    time_for_move = 10_000_000 // Minimum reasonable move time
+                }
                 writeln!(debug_file, "Computing move!");
                 // TODO parse_movetime
-                let (mut top_move, _score) = searcher.search(
+                let (mut top_move, _score, _depth) = searcher.search(
                     board_state.clone(),
                     Duration::new(
                         time_for_move / 1_000_000_000,
@@ -114,8 +125,10 @@ pub fn uci_loop() {
                 );
                 writeln!(
                     debug_file,
-                    "Searched {} nodes, tables at {} and {}",
+                    "Searched {} nodes, reached depth {}, estimate score {}, tables at {} and {}",
                     searcher.nodes,
+                    _depth,
+                    _score,
                     searcher.move_transposition_table.len(),
                     searcher.score_transposition_table.len()
                 );
