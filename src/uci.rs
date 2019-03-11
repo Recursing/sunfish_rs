@@ -4,7 +4,7 @@ use std::time::Duration;
 use crate::board::{after_move, gen_moves, A8, BOARD_SIZE, H8, INITIAL_BOARD_STATE};
 use crate::pieces::{Piece, Square};
 use crate::search::Searcher;
-use crate::ui::{parse_move, render_coordinates};
+use crate::ui::{parse_move, render_move};
 
 fn read_line() -> String {
     let mut line = String::new();
@@ -106,23 +106,11 @@ pub fn uci_loop() {
                     top_move.1 = BOARD_SIZE - 1 - top_move.1;
                 };
                 if is_promotion {
-                    println!(
-                        "bestmove {}{}q ponder e7e5",
-                        render_coordinates(top_move.0),
-                        render_coordinates(top_move.1)
-                    );
+                    println!("bestmove {}q ponder e7e5", render_move(&top_move));
                 } else {
-                    println!(
-                        "bestmove {}{} ponder e7e5",
-                        render_coordinates(top_move.0),
-                        render_coordinates(top_move.1)
-                    );
+                    println!("bestmove {} ponder e7e5", render_move(&top_move));
                 }
-                info!(
-                    "Sending bestmove {}{}",
-                    render_coordinates(top_move.0),
-                    render_coordinates(top_move.1)
-                );
+                info!("Sending bestmove {}", render_move(&top_move));
                 info!(
                     "Searched {} nodes, reached depth {}, estimate score {}, tables at {} and {}",
                     searcher.nodes,

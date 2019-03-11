@@ -18,9 +18,13 @@ pub fn parse_coordinates(coordinates: &str) -> usize {
         - BOARD_SIDE as usize * ((rank as i32 - '1' as i32) as usize)
 }
 
-pub fn render_coordinates(move_: usize) -> String {
-    let rank = b'8' - ((move_ - A8) as u8 / BOARD_SIDE as u8);
-    let file = (move_ - A8) as u8 % BOARD_SIDE as u8 + b'a';
+pub fn render_move(move_: &(usize, usize)) -> String {
+    render_coordinates(move_.0) + &render_coordinates(move_.1)
+}
+
+fn render_coordinates(position: usize) -> String {
+    let rank = b'8' - ((position - A8) as u8 / BOARD_SIDE as u8);
+    let file = (position - A8) as u8 % BOARD_SIDE as u8 + b'a';
     [file as char, rank as char].iter().collect()
 }
 
