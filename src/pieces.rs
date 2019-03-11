@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 extern crate rand;
 use crate::board::{BOARD_SIDE, BOARD_SIZE, PADDING};
+use lazy_static::lazy_static;
 use rand::random;
 
 pub struct Direction {}

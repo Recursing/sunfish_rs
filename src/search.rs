@@ -3,8 +3,6 @@ use crate::pieces::{Piece, Square};
 use std::cmp::max;
 use std::time::{Duration, Instant};
 
-extern crate lru;
-
 use lru::LruCache;
 
 pub const MATE_UPPER: i32 = 60_000 + 10 * 929; // TODO move somewhere else, do we need MATE_UPPER?
@@ -14,7 +12,8 @@ const QUIESCENCE_SEARCH_LIMIT: i32 = 150;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 
 #[derive(Clone, Copy)]
-pub struct Entry { // pub for debugging TODO refactor
+pub struct Entry {
+    // pub for debugging TODO refactor
     lower: i32,
     upper: i32,
 }
@@ -92,10 +91,10 @@ impl Searcher {
         // us. Note, we don't have to check for legality, since we've already
         // done it before. Also note that in QS the killer must be a capture,
         // otherwise we will be non deterministic.
-        let killer: Option<&(usize, usize)> = self.move_transposition_table.get(&hash);
+        let killer = self.move_transposition_table.get(&hash).cloned();
 
         if best < gamma && killer.is_some() {
-            let killer_move = killer.unwrap().clone();
+            let killer_move = killer.unwrap();
             if depth > 0 || move_value(board_state, &killer_move) >= QUIESCENCE_SEARCH_LIMIT {
                 let score = -self.bound(
                     &after_move(board_state, &killer_move),
@@ -186,7 +185,8 @@ impl Searcher {
         let now = Instant::now();
 
         // Bound depth to avoid infinite recursion in finished games
-        for _depth in 1..99 { // Realistically will reach depths around 6-20
+        for _depth in 1..99 {
+            // Realistically will reach depths around 6-20
             depth = _depth;
             let mut lower = -MATE_UPPER;
             let mut upper = MATE_UPPER;
@@ -203,14 +203,15 @@ impl Searcher {
             //println!("Reached depth {}", depth);
             //println!("Examined nodes {}", self.nodes);
             //println!("Searched for {:?}", now.elapsed());
-            if now.elapsed() > duration || _score > MATE_LOWER { // Don't waste time if a mate is found
+            if now.elapsed() > duration || _score > MATE_LOWER {
+                // Don't waste time if a mate is found
                 break;
             }
         }
 
         // If the game hasn't finished we can retrieve our move from the
         // transposition table.
-        return (
+        (
             *self
                 .move_transposition_table
                 .get(&hash)
@@ -220,7 +221,7 @@ impl Searcher {
                 .expect("score not in table")
                 .lower,
             depth,
-        );
+        )
     }
 
     // Done to prevent move repetitions
