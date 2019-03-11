@@ -4,10 +4,12 @@ use std::fs::OpenOptions;
 mod board;
 mod pieces;
 mod search;
+mod tests;
 mod uci;
 mod ui;
 //use crate::board::{after_move, gen_moves, rotated, BOARD_SIZE, INITIAL_BOARD_STATE};
 //use crate::search::{Searcher, MATE_LOWER, MATE_UPPER};
+use crate::tests::tests;
 use crate::uci::uci_loop;
 //use crate::ui::{parse_move, print_board, render};
 
@@ -22,6 +24,7 @@ fn set_global_logger() {
 
 fn main() {
     set_global_logger();
+    tests();
     uci_loop();
     /*let mut board_state = INITIAL_BOARD_STATE;
     let mut searcher = Searcher::new();
