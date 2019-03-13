@@ -1,9 +1,12 @@
+#![cfg(test)]
+
 use crate::board::{after_move, gen_moves, zobrist_hash, INITIAL_BOARD_STATE};
 use crate::search::{Searcher, MATE_LOWER};
 use crate::ui::{from_fen, parse_move, render_board, render_move};
 use std::time::{Duration, Instant};
 
-pub fn tests() -> bool {
+#[test]
+fn sicilian() {
     // Test FEN loading is coerent with move making
     let mut board_state = INITIAL_BOARD_STATE;
 
@@ -112,7 +115,10 @@ pub fn tests() -> bool {
         );
         board_state = after_move(&board_state, &parse_move(next_move));
     }
+}
 
+#[test]
+fn moves() {
     let move_fens = vec![
         "r1b1k2r/3n1p1p/p2PpnpR/qpp1p3/5P2/2N5/PPPQB1P1/1K1R2N1 w kq - 0 16",
         "7k/7p/8/1p5R/1P6/2Pb4/1r4PK/8 w - - 1 42",
@@ -168,7 +174,7 @@ pub fn tests() -> bool {
     ];
 
     for (fen, movelist) in move_fens.iter().zip(possible_moves) {
-        board_state = from_fen(fen);
+        let board_state = from_fen(fen);
         assert_eq!(
             movelist,
             gen_moves(&board_state)
@@ -177,7 +183,10 @@ pub fn tests() -> bool {
                 .collect::<Vec<_>>(),
         );
     }
+}
 
+#[test]
+fn mates() {
     // Since search exits early on mate found, can be used for benchmarking
     let mate_fens = vec![
         "1r1r1n1k/4qpnP/p1b1p1pQ/P2pP1N1/2pP2P1/1pP5/1P3PK1/RB5R w - - 7 31",
@@ -209,7 +218,10 @@ pub fn tests() -> bool {
         "mates solved in {:?}, should take less than 5s",
         mates_start_time.elapsed()
     );
+}
 
+#[test]
+fn puzzles() {
     let puzzle_fens = vec![
         "r2q1rk1/1p3ppp/p2bb3/3pn3/8/P1N1Q3/1PP1BPPP/R1B2RK1 b - - 9 16",
         "r5k1/1q3ppp/4p3/2p1P3/N7/2P5/P1R1QPPP/6K1 b - - 0 27",
@@ -220,13 +232,10 @@ pub fn tests() -> bool {
 
     let puzzle_solutions = vec!["e4e5", "g2g8", "b6d7", "f3e5", "e5g6"];
 
-    let time_for_puzzle = Duration::new(1, 0);
+    let time_for_puzzle = Duration::new(2, 0);
     for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
         let mut searcher = Searcher::new();
         let (top_move, _score, _depth) = searcher.search(from_fen(puzzle), time_for_puzzle);
         assert_eq!(render_move(&top_move), solution);
     }
-    println!("Puzzles solved");
-
-    true
 }
