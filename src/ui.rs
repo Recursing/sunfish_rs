@@ -1,4 +1,3 @@
-use std::char::from_digit;
 use std::collections::HashMap;
 
 use crate::board::{rotated, static_score, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING};
@@ -86,8 +85,8 @@ pub fn from_fen(fen: &str) -> BoardState {
     let mut board_string: String = fields[0].into();
     let (turn, castling, en_passant, _halfmoves, _fullmoves) =
         (fields[1], fields[2], fields[3], fields[4], fields[5]);
-    for d in 1..9 {
-        board_string = board_string.replace(from_digit(d, 10).unwrap(), &"_".repeat(d as usize));
+    for (dv, dc) in "123456789".chars().enumerate() {
+        board_string = board_string.replace(dc, &"_".repeat(dv + 1));
     }
     let board_lines: Vec<Vec<char>> = board_string
         .split('/')

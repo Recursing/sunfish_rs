@@ -13,7 +13,7 @@ fn set_global_logger() {
         .append(true)
         .create(true)
         .open("sunfish_log.log")
-        .unwrap();
+        .expect("Can't create log file in directory");
     let _ = WriteLogger::init(LevelFilter::Trace, Config::default(), file);
 }
 

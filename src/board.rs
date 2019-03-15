@@ -26,15 +26,16 @@ pub fn zobrist_hash(board_state: &BoardState) -> u64 {
             hash ^= ZOBRIST_MAP[&(index, *square)];
         }
     }
-    if board_state.en_passant_position.is_some() {
-        hash ^= ZOBRIST_MAP[&(board_state.en_passant_position.unwrap(), Square::Empty)]
+    match board_state.en_passant_position {
+        None => {}
+        Some(position) => hash ^= ZOBRIST_MAP[&(position, Square::Empty)],
     }
-    if board_state.king_passant_position.is_some() {
-        hash ^= ZOBRIST_MAP[&(
-            board_state.king_passant_position.unwrap() + BOARD_SIDE,
-            Square::Empty,
-        )]
+
+    match board_state.king_passant_position {
+        None => {}
+        Some(position) => hash ^= ZOBRIST_MAP[&(position + BOARD_SIDE, Square::Empty)],
     }
+
     let mut castling_rights_int = 0;
     if board_state.my_castling_rights.0 {
         castling_rights_int += 1
@@ -81,9 +82,8 @@ pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
                         if (*move_direction == Direction::NORTH + Direction::WEST
                             || *move_direction == Direction::NORTH + Direction::EAST)
                             && destination_square == Square::Empty
-                            && end_position != board_state.en_passant_position.unwrap_or(123_456) // TODO remove hack
-                            && end_position != board_state.king_passant_position.unwrap_or(123_456)
-                        // TODO remove hack
+                            && board_state.en_passant_position != Some(end_position)
+                            && board_state.king_passant_position != Some(end_position)
                         {
                             break;
                         }
@@ -239,8 +239,7 @@ pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardStat
         }
 
         // en passant capture (diagonal move to empty position)
-        // TODO remove hack
-        if end_position == board_state.en_passant_position.unwrap_or(0) {
+        if board_state.en_passant_position == Some(end_position) {
             new_board[end_position + Direction::SOUTH as usize] = Square::Empty;
         }
     }
@@ -272,9 +271,13 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
     }
 
     // Castling check detection
-    if (end_position as i32 - board_state.king_passant_position.unwrap_or(0) as i32).abs() < 2 {
-        // TODO remove hack
-        temp_score += PIECE_SQUARE_TABLES[&Piece::King][BOARD_SIZE - 1 - end_position];
+    match board_state.king_passant_position {
+        None => {}
+        Some(position) => {
+            if (end_position as i32 - position as i32).abs() < 2 {
+                temp_score += PIECE_SQUARE_TABLES[&Piece::King][BOARD_SIZE - 1 - end_position];
+            }
+        }
     }
 
     // Wierd pawn and king stuff (castling, promotions and en passant)
@@ -296,7 +299,7 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
                 //Promotion
                 temp_score += PIECE_SQUARE_TABLES[&Piece::Queen][end_position]
                     - PIECE_SQUARE_TABLES[&Piece::Pawn][end_position] //Always promote to queen
-            } else if end_position == board_state.en_passant_position.unwrap_or(0) {
+            } else if board_state.en_passant_position == Some(end_position) {
                 //Capture a pawn en passant
                 // TODO explain
                 temp_score +=

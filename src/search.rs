@@ -95,17 +95,22 @@ impl Searcher {
         // otherwise we will be non deterministic.
         let killer = self.move_transposition_table.get(&hash).cloned();
 
-        if best < gamma && killer.is_some() {
-            let killer_move = killer.unwrap();
-            if depth > 0 || move_value(board_state, &killer_move) >= QUIESCENCE_SEARCH_LIMIT {
-                let score = -self.bound(
-                    &after_move(board_state, &killer_move),
-                    1 - gamma,
-                    depth - 1,
-                    false,
-                );
-                best = std::cmp::max(best, score);
-                // should I add it again to the move_transposition_table?
+        match killer {
+            None => {}
+            Some(killer_move) => {
+                if best < gamma
+                    && (depth > 0
+                        || move_value(board_state, &killer_move) >= QUIESCENCE_SEARCH_LIMIT)
+                {
+                    let score = -self.bound(
+                        &after_move(board_state, &killer_move),
+                        1 - gamma,
+                        depth - 1,
+                        false,
+                    );
+                    best = std::cmp::max(best, score);
+                    // should I add it again to the move_transposition_table?
+                }
             }
         }
 
