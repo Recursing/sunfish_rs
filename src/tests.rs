@@ -208,7 +208,7 @@ fn mates() {
 
     let mates_start_time = Instant::now();
     for (puzzle, solution) in mate_fens.iter().zip(mate_solutions) {
-        let mut searcher = Searcher::new();
+        let mut searcher = Searcher::default();
         println!("{}", render_board(&from_fen(puzzle)));
         let (top_move, score, _depth) = searcher.search(from_fen(puzzle), time_for_mate);
         assert_eq!(render_move(&top_move), solution);
@@ -234,7 +234,7 @@ fn puzzles() {
 
     let time_for_puzzle = Duration::new(2, 0);
     for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
-        let mut searcher = Searcher::new();
+        let mut searcher = Searcher::default();
         let (top_move, _score, _depth) = searcher.search(from_fen(puzzle), time_for_puzzle);
         assert_eq!(render_move(&top_move), solution);
     }

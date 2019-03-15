@@ -30,15 +30,18 @@ pub struct Searcher {
     pub move_transposition_table: LruCache<u64, (usize, usize)>,
     pub nodes: u32,
 }
-impl Searcher {
-    pub fn new() -> Searcher {
+
+impl Default for Searcher {
+    fn default() -> Self {
         Searcher {
             score_transposition_table: LruCache::new(TRANSPOSITION_TABLE_SIZE),
             move_transposition_table: LruCache::new(TRANSPOSITION_TABLE_SIZE),
             nodes: 0,
         }
     }
+}
 
+impl Searcher {
     fn bound(&mut self, board_state: &BoardState, gamma: i32, depth: i32, root: bool) -> i32 {
         let hash = zobrist_hash(board_state);
         self.nodes += 1;

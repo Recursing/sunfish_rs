@@ -14,7 +14,7 @@ fn read_line() -> String {
 }
 
 pub fn uci_loop() {
-    let mut searcher = Searcher::new();
+    let mut searcher = Searcher::default();
     println!("Sunfish_rs");
     let mut board_state = INITIAL_BOARD_STATE;
     let mut am_black = false;
