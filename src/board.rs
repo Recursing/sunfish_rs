@@ -1,4 +1,4 @@
-use crate::pieces::{Direction, Piece, Square, PIECE_SQUARE_TABLES, ZOBRIST_MAP};
+use crate::pieces::{Direction, Piece, Square, ZOBRIST_MAP};
 
 pub const PADDING: usize = 2;
 pub const BOARD_SIDE: usize = 8 + 2 * PADDING;
@@ -262,20 +262,23 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
         panic!("Moving from a square without a piece")
     };
     // Actual move
-    let mut temp_score = PIECE_SQUARE_TABLES[&moving_piece][end_position]
-        - PIECE_SQUARE_TABLES[&moving_piece][start_position];
+    let mut temp_score =
+        moving_piece.midgame_value(end_position) - moving_piece.midgame_value(start_position);
 
     // Score for captures
     if let Square::OpponentPiece(captured_piece) = board_state.board[end_position] {
-        temp_score += PIECE_SQUARE_TABLES[&captured_piece][BOARD_SIZE - 1 - end_position]; // TODO: explain
+        // Add to the board score the value of the captured piece in the rotated board
+        temp_score += captured_piece.midgame_value(BOARD_SIZE - 1 - end_position);
     }
 
     // Castling check detection
     match board_state.king_passant_position {
         None => {}
         Some(position) => {
+            // If I'm moving to a position the opponent king just passed through while castling, I can capture it
+            // E.g. any of E1, F1, G1 for white short castling, the king_passant_position would be F1
             if (end_position as i32 - position as i32).abs() < 2 {
-                temp_score += PIECE_SQUARE_TABLES[&Piece::King][BOARD_SIZE - 1 - end_position];
+                temp_score += Piece::King.midgame_value(BOARD_SIZE - 1 - end_position);
             }
         }
     }
@@ -283,27 +286,26 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
     // Wierd pawn and king stuff (castling, promotions and en passant)
     match moving_piece {
         Piece::King => {
-            // castling, update the score with the new rook position
+            // Castling, update the score with the new rook position
             if (end_position as i32 - start_position as i32).abs() == 2 {
-                let rook_table = PIECE_SQUARE_TABLES[&Piece::Rook];
-                temp_score += rook_table[(start_position + end_position) / 2];
-                temp_score -= rook_table[if end_position < start_position {
+                temp_score += Piece::Rook.midgame_value((start_position + end_position) / 2);
+                temp_score -= Piece::Rook.midgame_value(if end_position < start_position {
                     A1
                 } else {
                     H1
-                }];
+                });
             }
         }
         Piece::Pawn => {
             if A8 <= end_position && end_position <= H8 {
                 //Promotion
-                temp_score += PIECE_SQUARE_TABLES[&Piece::Queen][end_position]
-                    - PIECE_SQUARE_TABLES[&Piece::Pawn][end_position] //Always promote to queen
+                temp_score += Piece::Queen.midgame_value(end_position)
+                    - Piece::Pawn.midgame_value(end_position) //Always promote to queen
             } else if board_state.en_passant_position == Some(end_position) {
                 //Capture a pawn en passant
                 // TODO explain
                 temp_score +=
-                    PIECE_SQUARE_TABLES[&Piece::Pawn][BOARD_SIZE - 1 - (end_position + BOARD_SIDE)]
+                    Piece::Pawn.midgame_value(BOARD_SIZE - 1 - (end_position + BOARD_SIDE))
             }
         }
         _ => {}
@@ -316,8 +318,8 @@ pub fn static_score(board: [Square; BOARD_SIZE]) -> i32 {
         .iter()
         .enumerate()
         .map(|(index, piece)| match piece {
-            Square::MyPiece(piece) => PIECE_SQUARE_TABLES[piece][index],
-            Square::OpponentPiece(piece) => -PIECE_SQUARE_TABLES[piece][BOARD_SIZE - 1 - index],
+            Square::MyPiece(piece) => piece.midgame_value(index),
+            Square::OpponentPiece(piece) => -piece.midgame_value(BOARD_SIZE - 1 - index),
             _ => 0,
         })
         .sum()

@@ -32,9 +32,6 @@ pub enum Square {
 }
 
 lazy_static! {
-    pub static ref PIECE_SQUARE_TABLES: HashMap<Piece, [i32; BOARD_SIZE]> =
-        get_piece_square_tables();
-
     // See https://en.wikipedia.org/wiki/Zobrist_hashing
     pub static ref ZOBRIST_MAP: HashMap<(usize, Square), u64> = get_zobrist_map();
 }
@@ -82,129 +79,95 @@ impl Piece {
             ],
         }
     }
-}
 
-pub fn get_piece_square_tables() -> HashMap<Piece, [i32; BOARD_SIZE]> {
-    // Piece square tables: piece value in different positions
-    // Values from https://github.com/official-stockfish/Stockfish/blob/05f7d59a9a27d9f8bce8bde4e9fed7ecefeb03b9
-    // For now just middle game, could add endgames
+    pub fn midgame_value(self, position: usize) -> i32 {
+        assert!(
+            position >= BOARD_SIDE * PADDING + PADDING
+                && position < BOARD_SIZE - BOARD_SIDE * PADDING - PADDING
+                && position % BOARD_SIDE >= PADDING
+                && position % BOARD_SIDE < BOARD_SIDE - PADDING
+        );
 
-    // From stockfish /src/types.h#L182,
-    let mut piece_values: HashMap<Piece, i32> = HashMap::new();
-    piece_values.insert(Piece::Pawn, 136); // 208
-    piece_values.insert(Piece::Knight, 782); // 865
-    piece_values.insert(Piece::Bishop, 830); // 918
-    piece_values.insert(Piece::Rook, 1289); // 1378
-    piece_values.insert(Piece::Queen, 2529); // 2687
-    piece_values.insert(Piece::King, 32000);
+        // Piece square tables: piece value in different positions
+        // Values from https://github.com/official-stockfish/Stockfish/blob/05f7d59a9a27d9f8bce8bde4e9fed7ecefeb03b9
 
-    // From stockfish /src/psqt.cpp#L31
-    let mut piece_position_values: HashMap<Piece, [i32; 64]> = HashMap::new();
-    piece_position_values.insert(
-        Piece::Pawn,
-        [
-            0, 0, 0, 0, 0, 0, 0, 0, // Last rank, no pawns
-            -10, 6, -5, -11, -2, -14, 12, -1, //
-            -6, -8, 5, 11, -14, 0, -12, -14, //
-            6, -3, -10, 1, 12, 6, -12, 1, //
-            -9, -18, 8, 22, 33, 25, -4, -16, //
-            -11, -10, -35, 22, 26, -35, 4, -24, //
-            0, -5, 10, 13, 21, 17, 6, -3, //
-            0, 0, 0, 0, 0, 0, 0, 0, //
-        ],
-    );
-    piece_position_values.insert(
-        Piece::Knight,
-        [
-            -200, -80, -53, -32, -32, -53, -80, -200, //
-            -67, -21, 6, 37, 37, 6, -21, -67, //
-            -11, 28, 63, 55, 55, 63, 28, -11, //
-            -29, 13, 42, 52, 52, 42, 13, -29, //
-            -28, 5, 41, 47, 47, 41, 5, -28, //
-            -64, -20, 4, 19, 19, 4, -20, -64, //
-            -79, -39, -24, -9, -9, -24, -39, -79, //
-            -169, -96, -80, -79, -79, -80, -96, -169, //
-        ],
-    );
-    piece_position_values.insert(
-        Piece::Bishop,
-        [
-            -48, -3, -12, -25, -25, -12, -3, -48, //
-            -21, -19, 10, -6, -6, 10, -19, -21, //
-            -17, 4, -1, 8, 8, -1, 4, -17, //
-            -7, 30, 23, 28, 28, 23, 30, -7, //
-            1, 8, 26, 37, 37, 26, 8, 1, //
-            -8, 24, -3, 15, 15, -3, 24, -8, //
-            -18, 7, 14, 3, 3, 14, 7, -18, //
-            -44, -4, -11, -28, -28, -11, -4, -44, //
-        ],
-    );
-    piece_position_values.insert(
-        Piece::Rook,
-        [
-            -22, -24, -6, 4, 4, -6, -24, -22, //
-            -8, 6, 10, 12, 12, 10, 6, -8, //
-            -24, -4, 4, 10, 10, 4, -4, -24, //
-            -24, -12, -1, 6, 6, -1, -12, -24, //
-            -13, -5, -4, -6, -6, -4, -5, -13, //
-            -21, -7, 3, -1, -1, 3, -7, -21, //
-            -18, -10, -5, 9, 9, -5, -10, -18, //
-            -24, -13, -7, 2, 2, -7, -13, -24, //
-        ],
-    );
-    piece_position_values.insert(
-        Piece::Queen,
-        [
-            -2, -2, 1, -2, -2, 1, -2, -2, //
-            -5, 6, 10, 8, 8, 10, 6, -5, //
-            -4, 10, 6, 8, 8, 6, 10, -4, //
-            0, 14, 12, 5, 5, 12, 14, 0, //
-            4, 5, 9, 8, 8, 9, 5, 4, //
-            -3, 6, 13, 7, 7, 13, 6, -3, //
-            -3, 5, 8, 12, 12, 8, 5, -3, //
-            3, -5, -5, 4, 4, -5, -5, 3, //
-        ],
-    );
-    piece_position_values.insert(
-        Piece::King,
-        [
-            64, 87, 49, 0, 0, 49, 87, 64, //
-            87, 120, 64, 25, 25, 64, 120, 87, //
-            122, 159, 85, 36, 36, 85, 159, 122, //
-            145, 176, 112, 69, 69, 112, 176, 145, //
-            169, 191, 136, 108, 108, 136, 191, 169, //
-            198, 253, 168, 120, 120, 168, 253, 198, //
-            277, 305, 241, 183, 183, 241, 305, 277, //
-            272, 325, 273, 190, 190, 273, 325, 272, //
-        ],
-    );
+        // From stockfish /src/types.h#L182,
+        let piece_value = match self {
+            Piece::Pawn => 136,
+            Piece::Knight => 782,
+            Piece::Bishop => 830,
+            Piece::Rook => 1289,
+            Piece::Queen => 2529,
+            Piece::King => 32000,
+        };
 
-    // TODO link to piece square tables, add explanation
-    let mut temp_piece_square_tables: HashMap<Piece, [i32; BOARD_SIZE]> = HashMap::new();
-
-    for (piece, position_values) in piece_position_values {
-        let piece_value = piece_values[&piece];
-        let mut piece_square_table = [0; BOARD_SIZE];
-
-        for position in 0..(PADDING * BOARD_SIDE) {
-            piece_square_table[position] = 0;
-            piece_square_table[BOARD_SIZE - position - 1] = 0;
-        }
-        for rank in 0..8 {
-            let first_of_rank = (rank + PADDING) * BOARD_SIDE;
-            for pad in 0..PADDING {
-                piece_square_table[first_of_rank + pad] = 0;
-                piece_square_table[first_of_rank + BOARD_SIDE - pad - 1] = 0;
-            }
-            for file in 0..8 {
-                piece_square_table[first_of_rank + PADDING + file] =
-                    position_values[rank * 8 + file] + piece_value;
-            }
-        }
-        temp_piece_square_tables.insert(piece, piece_square_table);
+        // From stockfish /src/psqt.cpp#L31
+        let piece_position_value = match self {
+            Piece::Pawn => [
+                0, 0, 0, 0, 0, 0, 0, 0, // Last rank, no pawns
+                -10, 6, -5, -11, -2, -14, 12, -1, //
+                -6, -8, 5, 11, -14, 0, -12, -14, //
+                6, -3, -10, 1, 12, 6, -12, 1, //
+                -9, -18, 8, 22, 33, 25, -4, -16, //
+                -11, -10, -35, 22, 26, -35, 4, -24, //
+                0, -5, 10, 13, 21, 17, 6, -3, //
+                0, 0, 0, 0, 0, 0, 0, 0, //
+            ],
+            Piece::Knight => [
+                -200, -80, -53, -32, -32, -53, -80, -200, //
+                -67, -21, 6, 37, 37, 6, -21, -67, //
+                -11, 28, 63, 55, 55, 63, 28, -11, //
+                -29, 13, 42, 52, 52, 42, 13, -29, //
+                -28, 5, 41, 47, 47, 41, 5, -28, //
+                -64, -20, 4, 19, 19, 4, -20, -64, //
+                -79, -39, -24, -9, -9, -24, -39, -79, //
+                -169, -96, -80, -79, -79, -80, -96, -169, //
+            ],
+            Piece::Bishop => [
+                -48, -3, -12, -25, -25, -12, -3, -48, //
+                -21, -19, 10, -6, -6, 10, -19, -21, //
+                -17, 4, -1, 8, 8, -1, 4, -17, //
+                -7, 30, 23, 28, 28, 23, 30, -7, //
+                1, 8, 26, 37, 37, 26, 8, 1, //
+                -8, 24, -3, 15, 15, -3, 24, -8, //
+                -18, 7, 14, 3, 3, 14, 7, -18, //
+                -44, -4, -11, -28, -28, -11, -4, -44, //
+            ],
+            Piece::Rook => [
+                -22, -24, -6, 4, 4, -6, -24, -22, //
+                -8, 6, 10, 12, 12, 10, 6, -8, //
+                -24, -4, 4, 10, 10, 4, -4, -24, //
+                -24, -12, -1, 6, 6, -1, -12, -24, //
+                -13, -5, -4, -6, -6, -4, -5, -13, //
+                -21, -7, 3, -1, -1, 3, -7, -21, //
+                -18, -10, -5, 9, 9, -5, -10, -18, //
+                -24, -13, -7, 2, 2, -7, -13, -24, //
+            ],
+            Piece::Queen => [
+                -2, -2, 1, -2, -2, 1, -2, -2, //
+                -5, 6, 10, 8, 8, 10, 6, -5, //
+                -4, 10, 6, 8, 8, 6, 10, -4, //
+                0, 14, 12, 5, 5, 12, 14, 0, //
+                4, 5, 9, 8, 8, 9, 5, 4, //
+                -3, 6, 13, 7, 7, 13, 6, -3, //
+                -3, 5, 8, 12, 12, 8, 5, -3, //
+                3, -5, -5, 4, 4, -5, -5, 3, //
+            ],
+            Piece::King => [
+                64, 87, 49, 0, 0, 49, 87, 64, //
+                87, 120, 64, 25, 25, 64, 120, 87, //
+                122, 159, 85, 36, 36, 85, 159, 122, //
+                145, 176, 112, 69, 69, 112, 176, 145, //
+                169, 191, 136, 108, 108, 136, 191, 169, //
+                198, 253, 168, 120, 120, 168, 253, 198, //
+                277, 305, 241, 183, 183, 241, 305, 277, //
+                272, 325, 273, 190, 190, 273, 325, 272, //
+            ],
+        };
+        let real_position = position - PADDING * BOARD_SIDE;
+        let row_number = real_position / BOARD_SIDE;
+        piece_value + piece_position_value[real_position - PADDING * (2 * row_number + 1)]
     }
-
-    temp_piece_square_tables
 }
 
 pub fn get_zobrist_map() -> HashMap<(usize, Square), u64> {
