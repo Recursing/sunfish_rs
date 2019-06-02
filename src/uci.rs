@@ -60,41 +60,51 @@ pub fn uci_loop() {
                 // print_board(&board_state);
             }
             "go" => {
-                // TODO: refactor time management
+                // TODO: refactor time management, should be somewhere else
 
                 // Command format is going to be:
                 // go wtime 391360 btime 321390 winc 8000 binc 8000
                 let infos: Vec<&str> = next_command.split(' ').collect();
-                let average_remaining_moves = 30;
-                // Super basic time management
-                let total_available_time: u64 = if infos.len() < 9 {
-                    4_000 * average_remaining_moves
+
+                // Just try to copy opponent time management
+                let time_difference: i32 = if infos.len() < 9 {
+                    4_000 // If I have no information, assume I have 4 seconds, used also for first move
                 } else if am_black {
-                    infos[4].parse::<u64>().expect("Failed to parse time")
-                        + infos[8].parse::<u64>().expect("Failed to parse time")
-                            * average_remaining_moves
+                    infos[4].parse::<i32>().expect("Failed to btime")
+                        - infos[2].parse::<i32>().expect("Failed to parse wtime")
                 } else {
-                    infos[2].parse::<u64>().expect("Failed to parse time")
-                        + infos[6].parse::<u64>().expect("Failed to parse time")
-                            * average_remaining_moves
+                    infos[2].parse::<i32>().expect("Failed to parse wtime")
+                        - infos[4].parse::<i32>().expect("Failed to parse btime")
                 };
 
-                let mut nanos_for_move: u64 =
-                    total_available_time * 1_000_000 / average_remaining_moves / 2;
-                if nanos_for_move > 1_000_000_000 {
-                    nanos_for_move -= 500_000_000 // Account for lag
+                let increment: i32 = if infos.len() < 9 {
+                    0 // Assume no increment
+                } else if am_black {
+                    infos[8].parse::<i32>().expect("Failed to parse binc")
                 } else {
-                    nanos_for_move = 200_000_000 // Minimum reasonable move time
+                    infos[6].parse::<i32>().expect("Failed to parse winc")
+                };
+
+                let mut nanos_for_move: i64 =
+                    i64::from(time_difference + increment - 10_000) * 1_000_000 / 2;
+
+                if nanos_for_move > 1_000_000_000 {
+                    nanos_for_move -= 200_000_000 // Account for lag
+                } else if nanos_for_move > 500_000_000 {
+                    nanos_for_move = 500_000_000 // Minimum reasonable move time
+                } else {
+                    nanos_for_move = 250_000_000 // Minimum unreasonable move time
                 }
 
                 let time_for_move = Duration::new(
-                    nanos_for_move / 1_000_000_000,
+                    nanos_for_move as u64 / 1_000_000_000,
                     (nanos_for_move % 1_000_000_000) as u32,
                 );
                 info!(
-                    "Computing move giving time {:?} with {}s remaining",
+                    "Computing move giving time {:?} with {}s difference and {}s increment",
                     time_for_move,
-                    total_available_time / 1000
+                    time_difference / 1000,
+                    increment / 1000,
                 );
                 // TODO parse_movetime
                 let (mut top_move, _score, _depth) =
