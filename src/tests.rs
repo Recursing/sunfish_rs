@@ -99,20 +99,22 @@ fn sicilian() {
         ],
     ];
 
-    for ((fen, next_move), move_list) in sicilian_fens
+    for ((fen, next_move), mut move_list) in sicilian_fens
         .iter()
         .zip(sicilian_moves)
         .zip(sicilian_possible_moves)
     {
         assert_eq!(render_board(&board_state), render_board(&from_fen(fen)));
         assert_eq!(zobrist_hash(&board_state), zobrist_hash(&from_fen(fen)));
-        assert_eq!(
-            move_list,
-            gen_moves(&board_state)
-                .iter()
-                .map(render_move)
-                .collect::<Vec<_>>()
-        );
+
+        // Compare sorted vecs to ignore move ordering
+        move_list.sort();
+        let mut generated_moves = gen_moves(&board_state)
+            .iter()
+            .map(render_move)
+            .collect::<Vec<_>>();
+        generated_moves.sort();
+        assert_eq!(move_list, generated_moves);
         board_state = after_move(&board_state, &parse_move(next_move));
     }
 }
@@ -212,6 +214,7 @@ fn mates() {
         println!("{}", render_board(&from_fen(puzzle)));
         let (top_move, score, _depth) = searcher.search(from_fen(puzzle), time_for_mate);
         assert_eq!(render_move(&top_move), solution);
+        println!("{}", score);
         assert!(score > MATE_LOWER);
     }
     println!(
@@ -223,14 +226,15 @@ fn mates() {
 #[test]
 fn puzzles() {
     let puzzle_fens = vec![
-        "r2q1rk1/1p3ppp/p2bb3/3pn3/8/P1N1Q3/1PP1BPPP/R1B2RK1 b - - 9 16",
         "r5k1/1q3ppp/4p3/2p1P3/N7/2P5/P1R1QPPP/6K1 b - - 0 27",
         "r3r1k1/pp1n2p1/2pq2p1/3p1p2/3P4/1NP2PnP/PP4P1/R1Q1RNK1 b - - 2 22",
         "r3k2r/1p3ppp/1qnbpn2/pP1p4/3P1P2/2PB1Q2/P2N2PP/R1B2RK1 b kq - 0 12",
         "r1bq1rk1/1p3pp1/p2p1n1p/2b1p3/2PnP3/P1NB4/1P1QNPPP/R1B2RK1 b - - 0 12",
+        "1r4k1/pp1r1p1p/2pp1P1Q/6P1/8/3q4/P5BP/4R1K1 b - - 1 27",
+        "r2q1rk1/1p3ppp/p2bb3/3pn3/8/P1N1Q3/1PP1BPPP/R1B2RK1 b - - 9 16",
     ];
 
-    let puzzle_solutions = vec!["e4e5", "g2g8", "b6d7", "f3e5", "e5g6"];
+    let puzzle_solutions = vec!["g2g8", "b6d7", "f3e5", "e5g6", "e6b3", "e4e5"];
 
     let time_for_puzzle = Duration::new(2, 0);
     for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
