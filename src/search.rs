@@ -7,10 +7,10 @@ use lru::LruCache;
 use crate::board::{after_move, gen_moves, move_value, nullmove, zobrist_hash, BoardState};
 use crate::pieces::{Piece, Square};
 
-pub const MATE_UPPER: i32 = 60_000 + 10 * 929; // TODO move somewhere else, do we need MATE_UPPER?
-pub const MATE_LOWER: i32 = 60_000 - 10 * 929;
+pub const MATE_UPPER: i32 = 32_000 + 8 * 2529; // TODO move somewhere else, do we need MATE_UPPER?
+pub const MATE_LOWER: i32 = 32_000 - 8 * 2529;
 const TRANSPOSITION_TABLE_SIZE: usize = 50_000_000; // TODO explain, TODO why does it use so much memory?? more than py? TODO does realistically get filled? can we use just a normal hashtable?
-const QUIESCENCE_SEARCH_LIMIT: i32 = 150;
+const QUIESCENCE_SEARCH_LIMIT: i32 = 130;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 
 #[derive(Clone, Copy)]
