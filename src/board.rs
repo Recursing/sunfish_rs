@@ -1,4 +1,4 @@
-use crate::pieces::{Direction, Piece, Square, PIECE_MOVES, PIECE_SQUARE_TABLES, ZOBRIST_MAP};
+use crate::pieces::{Direction, Piece, Square, PIECE_SQUARE_TABLES, ZOBRIST_MAP};
 
 pub const PADDING: usize = 2;
 pub const BOARD_SIDE: usize = 8 + 2 * PADDING;
@@ -58,7 +58,7 @@ pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
     let mut moves: Vec<(usize, usize)> = Vec::new();
     for (start_position, start_square) in board_state.board.iter().enumerate() {
         if let Square::MyPiece(piece_moving) = start_square {
-            for move_direction in &PIECE_MOVES[&piece_moving] {
+            for move_direction in piece_moving.moves() {
                 for end_position in
                     (1..).map(|k| (start_position as i32 + move_direction * k) as usize)
                 {

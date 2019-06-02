@@ -32,7 +32,6 @@ pub enum Square {
 }
 
 lazy_static! {
-    pub static ref PIECE_MOVES: HashMap<Piece, Vec<i32>> = get_piece_moves();
     pub static ref PIECE_SQUARE_TABLES: HashMap<Piece, [i32; BOARD_SIZE]> =
         get_piece_square_tables();
 
@@ -40,64 +39,49 @@ lazy_static! {
     pub static ref ZOBRIST_MAP: HashMap<(usize, Square), u64> = get_zobrist_map();
 }
 
-pub fn get_piece_moves() -> HashMap<Piece, Vec<i32>> {
-    let mut temp_piece_moves: HashMap<Piece, Vec<i32>> = HashMap::new();
-    // TODO would like to use fixed sized slices/tuples
-    temp_piece_moves.insert(
-        Piece::Pawn,
-        vec![
-            Direction::NORTH,
-            Direction::NORTH + Direction::NORTH,
-            Direction::NORTH + Direction::WEST,
-            Direction::NORTH + Direction::EAST,
-        ],
-    );
-    temp_piece_moves.insert(
-        Piece::Knight,
-        vec![
-            Direction::NORTH + Direction::NORTH + Direction::EAST,
-            Direction::NORTH + Direction::NORTH + Direction::WEST,
-            Direction::WEST + Direction::WEST + Direction::NORTH,
-            Direction::WEST + Direction::WEST + Direction::SOUTH,
-            Direction::SOUTH + Direction::SOUTH + Direction::WEST,
-            Direction::SOUTH + Direction::SOUTH + Direction::EAST,
-            Direction::EAST + Direction::EAST + Direction::SOUTH,
-            Direction::EAST + Direction::EAST + Direction::NORTH,
-        ],
-    );
-    temp_piece_moves.insert(
-        Piece::Bishop,
-        vec![
-            Direction::NORTH + Direction::EAST,
-            Direction::NORTH + Direction::WEST,
-            Direction::WEST + Direction::SOUTH,
-            Direction::SOUTH + Direction::EAST,
-        ],
-    );
-    temp_piece_moves.insert(
-        Piece::Rook,
-        vec![
-            Direction::NORTH,
-            Direction::WEST,
-            Direction::SOUTH,
-            Direction::EAST,
-        ],
-    );
-    temp_piece_moves.insert(
-        Piece::Queen,
-        vec![
-            Direction::NORTH,
-            Direction::WEST,
-            Direction::SOUTH,
-            Direction::EAST,
-            Direction::NORTH + Direction::EAST,
-            Direction::NORTH + Direction::WEST,
-            Direction::WEST + Direction::SOUTH,
-            Direction::SOUTH + Direction::EAST,
-        ],
-    );
-    temp_piece_moves.insert(Piece::King, temp_piece_moves[&Piece::Queen].clone());
-    temp_piece_moves
+impl Piece {
+    pub fn moves(self) -> &'static [i32] {
+        match self {
+            Piece::Pawn => &[
+                Direction::NORTH,
+                Direction::NORTH + Direction::NORTH,
+                Direction::NORTH + Direction::WEST,
+                Direction::NORTH + Direction::EAST,
+            ],
+            Piece::Knight => &[
+                Direction::NORTH + Direction::NORTH + Direction::EAST,
+                Direction::NORTH + Direction::NORTH + Direction::WEST,
+                Direction::WEST + Direction::WEST + Direction::NORTH,
+                Direction::WEST + Direction::WEST + Direction::SOUTH,
+                Direction::SOUTH + Direction::SOUTH + Direction::WEST,
+                Direction::SOUTH + Direction::SOUTH + Direction::EAST,
+                Direction::EAST + Direction::EAST + Direction::SOUTH,
+                Direction::EAST + Direction::EAST + Direction::NORTH,
+            ],
+            Piece::Bishop => &[
+                Direction::NORTH + Direction::EAST,
+                Direction::NORTH + Direction::WEST,
+                Direction::WEST + Direction::SOUTH,
+                Direction::SOUTH + Direction::EAST,
+            ],
+            Piece::Rook => &[
+                Direction::NORTH,
+                Direction::WEST,
+                Direction::SOUTH,
+                Direction::EAST,
+            ],
+            Piece::Queen | Piece::King => &[
+                Direction::NORTH,
+                Direction::WEST,
+                Direction::SOUTH,
+                Direction::EAST,
+                Direction::NORTH + Direction::EAST,
+                Direction::NORTH + Direction::WEST,
+                Direction::WEST + Direction::SOUTH,
+                Direction::SOUTH + Direction::EAST,
+            ],
+        }
+    }
 }
 
 pub fn get_piece_square_tables() -> HashMap<Piece, [i32; BOARD_SIZE]> {
@@ -124,7 +108,7 @@ pub fn get_piece_square_tables() -> HashMap<Piece, [i32; BOARD_SIZE]> {
             -6, -8, 5, 11, -14, 0, -12, -14, //
             6, -3, -10, 1, 12, 6, -12, 1, //
             -9, -18, 8, 22, 33, 25, -4, -16, //
-            -11, -10, 15, 22, 26, 28, 4, -24, //
+            -11, -10, -35, 22, 26, -35, 4, -24, //
             0, -5, 10, 13, 21, 17, 6, -3, //
             0, 0, 0, 0, 0, 0, 0, 0, //
         ],
@@ -225,11 +209,17 @@ pub fn get_piece_square_tables() -> HashMap<Piece, [i32; BOARD_SIZE]> {
 
 pub fn get_zobrist_map() -> HashMap<(usize, Square), u64> {
     let mut zobrist_map_temp: HashMap<(usize, Square), u64> = HashMap::new();
+    let pieces = &[
+        Piece::Pawn,
+        Piece::Bishop,
+        Piece::Knight,
+        Piece::Rook,
+        Piece::Queen,
+        Piece::King,
+    ];
     for position in 0..BOARD_SIZE {
-        for (piece, _moves) in get_piece_moves() {
+        for &piece in pieces {
             zobrist_map_temp.insert((position, Square::MyPiece(piece)), random());
-        }
-        for (piece, _moves) in get_piece_moves() {
             zobrist_map_temp.insert((position, Square::OpponentPiece(piece)), random());
         }
         // Used for en passant, castling and king passant
