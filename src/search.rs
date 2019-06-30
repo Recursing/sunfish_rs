@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use lru::LruCache;
 
-use crate::board::{after_move, gen_moves, move_value, nullmove, zobrist_hash, BoardState};
+use crate::board::{after_move, gen_moves, move_value, nullmove, BoardState};
 use crate::pieces::{Piece, Square};
 
 pub const MATE_UPPER: i32 = 32_000 + 8 * 2529; // TODO move somewhere else, do we need MATE_UPPER?
@@ -26,8 +26,8 @@ const DEFAULT_ENTRY: Entry = Entry {
 };
 
 pub struct Searcher {
-    pub score_transposition_table: LruCache<(u64, i32, bool), Entry>,
-    pub move_transposition_table: LruCache<u64, (usize, usize)>,
+    pub score_transposition_table: LruCache<(BoardState, i32, bool), Entry>,
+    pub move_transposition_table: LruCache<BoardState, (usize, usize)>,
     pub nodes: u32,
 }
 
@@ -43,7 +43,6 @@ impl Default for Searcher {
 
 impl Searcher {
     fn bound(&mut self, board_state: &BoardState, gamma: i32, depth: i32, root: bool) -> i32 {
-        let hash = zobrist_hash(board_state);
         self.nodes += 1;
 
         // Sunfish is a king-capture engine, so we should always check if we
@@ -63,10 +62,12 @@ impl Searcher {
 
         let entry = *self
             .score_transposition_table
-            .get(&(hash, max(depth, 0), root))
+            .get(&(*board_state, max(depth, 0), root))
             .unwrap_or(&DEFAULT_ENTRY);
 
-        if entry.lower >= gamma && (!root || self.move_transposition_table.get(&hash).is_some()) {
+        if entry.lower >= gamma
+            && (!root || self.move_transposition_table.get(board_state).is_some())
+        {
             return entry.lower;
         } else if entry.upper < gamma {
             return entry.upper;
@@ -76,14 +77,14 @@ impl Searcher {
         // First try not moving at all
         if depth > 0
             && !root
-            && (vec![
-                Square::MyPiece(Piece::Rook),
-                Square::MyPiece(Piece::Knight),
-                Square::MyPiece(Piece::Bishop),
-                Square::MyPiece(Piece::Queen),
-            ]
-            .iter()
-            .any(|s| board_state.board.contains(&s)))
+            && (board_state.board.iter().any(|&s| match s {
+                // TODO maybe base it on the board score?
+                Square::MyPiece(Piece::Rook)
+                | Square::MyPiece(Piece::Knight)
+                | Square::MyPiece(Piece::Bishop)
+                | Square::MyPiece(Piece::Queen) => true,
+                _ => false,
+            }))
         {
             let score = -self.bound(&nullmove(board_state), 1 - gamma, depth - 3, false);
             best = std::cmp::max(best, score);
@@ -96,7 +97,7 @@ impl Searcher {
         // us. Note, we don't have to check for legality, since we've already
         // done it before. Also note that in QS the killer must be a capture,
         // otherwise we will be non deterministic.
-        let killer = self.move_transposition_table.get(&hash).cloned();
+        let killer = self.move_transposition_table.get(board_state).cloned();
 
         match killer {
             None => {}
@@ -128,7 +129,7 @@ impl Searcher {
                     best = std::cmp::max(best, score);
                     if best >= gamma {
                         // Save the move for pv construction and killer heuristic
-                        self.move_transposition_table.put(hash, *m);
+                        self.move_transposition_table.put(*board_state, *m);
                         //println!("other: {}", best);
                         break;
                     }
@@ -164,7 +165,7 @@ impl Searcher {
         // Update score_transposition_table
         if best >= gamma {
             self.score_transposition_table.put(
-                (hash, depth, root),
+                (*board_state, depth, root),
                 Entry {
                     lower: best,
                     upper: entry.upper,
@@ -172,7 +173,7 @@ impl Searcher {
             );
         } else if best < gamma {
             self.score_transposition_table.put(
-                (hash, depth, root),
+                (*board_state, depth, root),
                 Entry {
                     lower: entry.lower,
                     upper: best,
@@ -190,7 +191,6 @@ impl Searcher {
         duration: Duration,
     ) -> ((usize, usize), i32, i32) {
         self.nodes = 0;
-        let hash = zobrist_hash(&board_state);
         let mut depth = 0;
         let now = Instant::now();
 
@@ -227,10 +227,10 @@ impl Searcher {
         (
             *self
                 .move_transposition_table
-                .get(&hash)
+                .get(&board_state)
                 .expect("move not in table"),
             self.score_transposition_table
-                .get(&(hash, depth, true))
+                .get(&(board_state, depth, true))
                 .expect("score not in table")
                 .lower,
             depth,
@@ -239,11 +239,10 @@ impl Searcher {
 
     // Done to prevent move repetitions
     pub fn set_eval_to_zero(&mut self, board_state: &BoardState) {
-        let hash = zobrist_hash(board_state);
         // TODO there's probably a better way
         for depth in 1..30 {
             self.score_transposition_table
-                .put((hash, depth, false), Entry { lower: 0, upper: 0 });
+                .put((*board_state, depth, false), Entry { lower: 0, upper: 0 });
         }
     }
 }

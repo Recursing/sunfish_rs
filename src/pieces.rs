@@ -1,8 +1,4 @@
-use std::collections::HashMap;
-extern crate rand;
 use crate::board::{BOARD_SIDE, BOARD_SIZE, PADDING};
-use lazy_static::lazy_static;
-use rand::random;
 
 pub struct Direction {}
 
@@ -29,11 +25,6 @@ pub enum Square {
     OpponentPiece(Piece),
     Empty,
     Wall, // Here to simplify detection of out of board moves
-}
-
-lazy_static! {
-    // See https://en.wikipedia.org/wiki/Zobrist_hashing
-    pub static ref ZOBRIST_MAP: HashMap<(usize, Square), u64> = get_zobrist_map();
 }
 
 impl Piece {
@@ -170,23 +161,3 @@ impl Piece {
     }
 }
 
-pub fn get_zobrist_map() -> HashMap<(usize, Square), u64> {
-    let mut zobrist_map_temp: HashMap<(usize, Square), u64> = HashMap::new();
-    let pieces = &[
-        Piece::Pawn,
-        Piece::Bishop,
-        Piece::Knight,
-        Piece::Rook,
-        Piece::Queen,
-        Piece::King,
-    ];
-    for position in 0..BOARD_SIZE {
-        for &piece in pieces {
-            zobrist_map_temp.insert((position, Square::MyPiece(piece)), random());
-            zobrist_map_temp.insert((position, Square::OpponentPiece(piece)), random());
-        }
-        // Used for en passant, castling and king passant
-        zobrist_map_temp.insert((position, Square::Empty), random());
-    }
-    zobrist_map_temp
-}

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-
-use crate::board::{rotated, static_score, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING};
+use crate::board::{
+    rotated, static_score, BoardState, Board, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING,
+};
 use crate::pieces::{Piece, Square};
 
 pub fn parse_move(move_: &str) -> (usize, usize) {
@@ -27,21 +27,28 @@ fn render_coordinates(position: usize) -> String {
     [file as char, rank as char].iter().collect()
 }
 
+impl Square {
+    pub fn to_unicode(self) -> char {
+        match self {
+            Square::MyPiece(Piece::Rook) => '♜',
+            Square::MyPiece(Piece::Knight) => '♞',
+            Square::MyPiece(Piece::Bishop) => '♝',
+            Square::MyPiece(Piece::Queen) => '♛',
+            Square::MyPiece(Piece::King) => '♚',
+            Square::MyPiece(Piece::Pawn) => '♟',
+            Square::OpponentPiece(Piece::Rook) => '♖',
+            Square::OpponentPiece(Piece::Knight) => '♘',
+            Square::OpponentPiece(Piece::Bishop) => '♗',
+            Square::OpponentPiece(Piece::Queen) => '♕',
+            Square::OpponentPiece(Piece::King) => '♔',
+            Square::OpponentPiece(Piece::Pawn) => '♙',
+            Square::Empty => '·',
+            Square::Wall => 'X',
+        }
+    }
+}
+
 pub fn render_board(board_state: &BoardState) -> String {
-    let mut uni_pieces = HashMap::new();
-    uni_pieces.insert(Square::MyPiece(Piece::Rook), '♜');
-    uni_pieces.insert(Square::MyPiece(Piece::Knight), '♞');
-    uni_pieces.insert(Square::MyPiece(Piece::Bishop), '♝');
-    uni_pieces.insert(Square::MyPiece(Piece::Queen), '♛');
-    uni_pieces.insert(Square::MyPiece(Piece::King), '♚');
-    uni_pieces.insert(Square::MyPiece(Piece::Pawn), '♟');
-    uni_pieces.insert(Square::OpponentPiece(Piece::Rook), '♖');
-    uni_pieces.insert(Square::OpponentPiece(Piece::Knight), '♘');
-    uni_pieces.insert(Square::OpponentPiece(Piece::Bishop), '♗');
-    uni_pieces.insert(Square::OpponentPiece(Piece::Queen), '♕');
-    uni_pieces.insert(Square::OpponentPiece(Piece::King), '♔');
-    uni_pieces.insert(Square::OpponentPiece(Piece::Pawn), '♙');
-    uni_pieces.insert(Square::Empty, '·');
     let mut rendered_board: String = String::from("");
 
     for (i, row) in board_state
@@ -53,7 +60,7 @@ pub fn render_board(board_state: &BoardState) -> String {
     {
         rendered_board.push_str(&format!(" {} ", 8 - i));
         for p in row.iter().skip(PADDING).take(8) {
-            rendered_board.push_str(&format!(" {}", uni_pieces[p]));
+            rendered_board.push_str(&format!(" {}", p.to_unicode()));
         }
         rendered_board.push_str("\n");
     }
@@ -80,18 +87,21 @@ pub fn render_board(board_state: &BoardState) -> String {
 
 // https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation#Definition
 pub fn from_fen(fen: &str) -> BoardState {
-    let mut new_board = [Square::Empty; BOARD_SIZE];
+    let mut new_board = Board::new([Square::Empty; BOARD_SIZE]);
     let fields = fen.split(' ').collect::<Vec<_>>();
     let mut board_string: String = fields[0].into();
     let (turn, castling, en_passant, _halfmoves, _fullmoves) =
         (fields[1], fields[2], fields[3], fields[4], fields[5]);
-    for (dv, dc) in "123456789".chars().enumerate() {
-        board_string = board_string.replace(dc, &"_".repeat(dv + 1));
+
+    for (dv, dc) in "0123456789".chars().enumerate() {
+        board_string = board_string.replace(dc, &"_".repeat(dv));
     }
+
     let board_lines: Vec<Vec<char>> = board_string
         .split('/')
         .map(|s| s.chars().collect())
         .collect();
+
     for rank in 0..BOARD_SIDE {
         for file in 0..BOARD_SIDE {
             let position = rank * BOARD_SIDE + file;

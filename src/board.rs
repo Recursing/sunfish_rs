@@ -1,4 +1,7 @@
-use crate::pieces::{Direction, Piece, Square, ZOBRIST_MAP};
+use crate::pieces::{Direction, Piece, Square};
+use std::fmt::Debug;
+use std::hash::{Hash, Hasher};
+use std::ops::{Index, IndexMut};
 
 pub const PADDING: usize = 2;
 pub const BOARD_SIDE: usize = 8 + 2 * PADDING;
@@ -9,9 +12,9 @@ pub const H8: usize = A8 + 7;
 pub const A1: usize = A8 + 7 * BOARD_SIDE;
 const H1: usize = A1 + 7;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 pub struct BoardState {
-    pub board: [Square; BOARD_SIZE],
+    pub board: Board,
     pub score: i32,
     pub my_castling_rights: (bool, bool), // first west, second east
     pub opponent_castling_rights: (bool, bool), // first west, second east
@@ -19,39 +22,62 @@ pub struct BoardState {
     pub king_passant_position: Option<usize>, // square where I could capture the king, used to treat castling as en passant
 }
 
-pub fn zobrist_hash(board_state: &BoardState) -> u64 {
-    let mut hash = 0;
-    for (index, square) in board_state.board.iter().enumerate() {
-        if *square != Square::Empty && *square != Square::Wall {
-            hash ^= ZOBRIST_MAP[&(index, *square)];
-        }
+#[derive(Clone, Copy)]
+pub struct Board([Square; BOARD_SIZE]);
+
+impl Index<usize> for Board {
+    type Output = Square;
+
+    fn index(&self, location: usize) -> &Square {
+        self.0.index(location)
     }
-    match board_state.en_passant_position {
-        None => {}
-        Some(position) => hash ^= ZOBRIST_MAP[&(position, Square::Empty)],
+}
+
+impl IndexMut<usize> for Board {
+    fn index_mut(&mut self, location: usize) -> &mut Square {
+        self.0.index_mut(location)
+    }
+}
+
+impl PartialEq for Board {
+    fn eq(&self, rhs: &Board) -> bool {
+        self.0[..] == rhs.0[..]
+    }
+}
+
+impl Eq for Board {}
+
+impl Hash for Board {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl Debug for Board {
+    fn fmt(
+        &self,
+        formatter: &mut std::fmt::Formatter<'_>,
+    ) -> std::result::Result<(), std::fmt::Error> {
+        self.0[..].fmt(formatter)
+    }
+}
+
+impl Board {
+    pub fn new(board: [Square; BOARD_SIZE]) -> Board {
+        Board(board)
     }
 
-    match board_state.king_passant_position {
-        None => {}
-        Some(position) => hash ^= ZOBRIST_MAP[&(position + BOARD_SIDE, Square::Empty)],
+    pub fn iter(&self) -> std::slice::Iter<'_, Square> {
+        self.0.iter()
     }
 
-    let mut castling_rights_int = 0;
-    if board_state.my_castling_rights.0 {
-        castling_rights_int += 1
-    }
-    if board_state.my_castling_rights.1 {
-        castling_rights_int += 2
-    }
-    if board_state.opponent_castling_rights.0 {
-        castling_rights_int += 4
-    }
-    if board_state.opponent_castling_rights.1 {
-        castling_rights_int += 8
+    pub fn chunks(&self, size: usize) -> std::slice::Chunks<'_, Square> {
+        self.0.chunks(size)
     }
 
-    hash ^= ZOBRIST_MAP[&(2 * BOARD_SIDE + castling_rights_int, Square::Empty)];
-    hash
+    fn iter_mut(&mut self) -> std::slice::IterMut<'_, Square> {
+        self.0.iter_mut()
+    }
 }
 
 pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
@@ -143,7 +169,7 @@ pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
 }
 
 pub fn rotated(board_state: &BoardState) -> BoardState {
-    let mut new_board: [Square; BOARD_SIZE] = [Square::Empty; BOARD_SIZE];
+    let mut new_board: Board = Board([Square::Empty; BOARD_SIZE]);
     for (coordinate, square) in new_board.iter_mut().enumerate() {
         *square = match board_state.board[BOARD_SIZE - 1 - coordinate] {
             Square::Empty => Square::Empty,
@@ -168,7 +194,7 @@ pub fn rotated(board_state: &BoardState) -> BoardState {
 
 // Like rotate, but clears ep and kp
 pub fn nullmove(board_state: &BoardState) -> BoardState {
-    let mut new_board: [Square; BOARD_SIZE] = [Square::Empty; BOARD_SIZE];
+    let mut new_board: Board = Board([Square::Empty; BOARD_SIZE]);
     for (coordinate, square) in new_board.iter_mut().enumerate() {
         *square = match board_state.board[BOARD_SIZE - 1 - coordinate] {
             Square::Empty => Square::Empty,
@@ -190,7 +216,7 @@ pub fn nullmove(board_state: &BoardState) -> BoardState {
 pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardState {
     let (start_position, end_position) = *move_;
     let start_square = board_state.board[start_position];
-    let mut new_board = board_state.board;
+    let mut new_board = board_state.board.clone();
     let mut my_castling_rights = board_state.my_castling_rights;
     let mut opponent_castling_rights = board_state.opponent_castling_rights;
     let mut en_passant_position = None;
@@ -313,7 +339,7 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
     temp_score
 }
 
-pub fn static_score(board: [Square; BOARD_SIZE]) -> i32 {
+pub fn static_score(board: Board) -> i32 {
     board
         .iter()
         .enumerate()
@@ -483,7 +509,7 @@ const INITIAL_BOARD: [Square; BOARD_SIZE] = [
 ];
 
 pub const INITIAL_BOARD_STATE: BoardState = BoardState {
-    board: INITIAL_BOARD,
+    board: Board(INITIAL_BOARD),
     score: 0,
     my_castling_rights: (true, true),
     opponent_castling_rights: (true, true),

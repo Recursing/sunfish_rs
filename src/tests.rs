@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::board::{after_move, gen_moves, zobrist_hash, INITIAL_BOARD_STATE};
+use crate::board::{after_move, gen_moves, INITIAL_BOARD_STATE};
 use crate::search::{Searcher, MATE_LOWER};
 use crate::ui::{from_fen, parse_move, render_board, render_move};
 use std::time::{Duration, Instant};
@@ -105,7 +105,7 @@ fn sicilian() {
         .zip(sicilian_possible_moves)
     {
         assert_eq!(render_board(&board_state), render_board(&from_fen(fen)));
-        assert_eq!(zobrist_hash(&board_state), zobrist_hash(&from_fen(fen)));
+        assert_eq!(&board_state, &from_fen(fen));
 
         // Compare sorted vecs to ignore move ordering
         move_list.sort();
