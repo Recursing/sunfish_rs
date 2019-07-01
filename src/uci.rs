@@ -107,8 +107,7 @@ pub fn uci_loop() {
                     increment / 1000,
                 );
                 // TODO parse_movetime
-                let (mut top_move, _score, _depth) =
-                    searcher.search(board_state.clone(), time_for_move);
+                let (mut top_move, _score, _depth) = searcher.search(board_state, time_for_move);
                 let is_promotion = (A8 <= top_move.1 && top_move.1 <= H8)
                     && board_state.board[top_move.0] == Square::MyPiece(Piece::Pawn);
                 if am_black {

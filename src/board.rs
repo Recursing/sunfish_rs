@@ -216,7 +216,7 @@ pub fn nullmove(board_state: &BoardState) -> BoardState {
 pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardState {
     let (start_position, end_position) = *move_;
     let start_square = board_state.board[start_position];
-    let mut new_board = board_state.board.clone();
+    let mut new_board = board_state.board;
     let mut my_castling_rights = board_state.my_castling_rights;
     let mut opponent_castling_rights = board_state.opponent_castling_rights;
     let mut en_passant_position = None;

@@ -218,8 +218,8 @@ fn mates() {
         assert!(score > MATE_LOWER);
     }
     println!(
-        "mates solved in {:?}, should take less than 5s",
-        mates_start_time.elapsed()
+        "mates solved in {}ms, should not take more than 5000ms",
+        mates_start_time.elapsed().as_millis()
     );
 }
 
@@ -240,6 +240,7 @@ fn puzzles() {
     for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
         let mut searcher = Searcher::default();
         let (top_move, _score, _depth) = searcher.search(from_fen(puzzle), time_for_puzzle);
+        println!("puzzle {}", solution);
         assert_eq!(render_move(&top_move), solution);
     }
 }

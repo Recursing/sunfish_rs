@@ -1,4 +1,4 @@
-use log::trace;
+use log::info;
 use std::cmp::max;
 use std::time::{Duration, Instant};
 
@@ -9,7 +9,7 @@ use crate::pieces::{Piece, Square};
 
 pub const MATE_UPPER: i32 = 32_000 + 8 * 2529; // TODO move somewhere else, do we need MATE_UPPER?
 pub const MATE_LOWER: i32 = 32_000 - 8 * 2529;
-const TRANSPOSITION_TABLE_SIZE: usize = 50_000_000; // TODO explain, TODO why does it use so much memory?? more than py? TODO does realistically get filled? can we use just a normal hashtable?
+const TRANSPOSITION_TABLE_SIZE: usize = 5_000_000; // TODO explain, make more space efficient
 const QUIESCENCE_SEARCH_LIMIT: i32 = 130;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 
@@ -67,6 +67,7 @@ impl Searcher {
 
         if entry.lower >= gamma
             && (!root || self.move_transposition_table.get(board_state).is_some())
+        // TODO do this last check before calling root, also remove root parameter
         {
             return entry.lower;
         } else if entry.upper < gamma {
@@ -191,13 +192,12 @@ impl Searcher {
         duration: Duration,
     ) -> ((usize, usize), i32, i32) {
         self.nodes = 0;
-        let mut depth = 0;
+        let mut reached_depth = 0;
         let now = Instant::now();
 
         // Bound depth to avoid infinite recursion in finished games
-        for _depth in 1..99 {
-            // Realistically will reach depths around 6-20
-            depth = _depth;
+        for depth in 1..99 {
+            // Realistically will reach depths around 6-12, except endgames
             let mut lower = -MATE_UPPER;
             let mut upper = MATE_UPPER;
             while lower < upper - EVAL_ROUGHNESS {
@@ -209,14 +209,18 @@ impl Searcher {
                     upper = score;
                 }
             }
-            let _score = self.bound(&board_state, lower, depth, true);
-            trace!(
-                "Reached depth {} nodes {} time {:?}",
+
+            let score = self.bound(&board_state, lower, depth, true);
+            reached_depth = depth;
+            info!(
+                "Reached depth {: <2} score {: <5} nodes {: <7} time {:?}",
                 depth,
+                score,
                 self.nodes,
                 now.elapsed()
             );
-            if now.elapsed() > duration || _score > MATE_LOWER {
+
+            if now.elapsed() > duration || score > MATE_LOWER {
                 // Don't waste time if a mate is found
                 break;
             }
@@ -230,10 +234,10 @@ impl Searcher {
                 .get(&board_state)
                 .expect("move not in table"),
             self.score_transposition_table
-                .get(&(board_state, depth, true))
+                .get(&(board_state, reached_depth, true))
                 .expect("score not in table")
                 .lower,
-            depth,
+            reached_depth,
         )
     }
 
