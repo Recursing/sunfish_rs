@@ -81,7 +81,7 @@ impl Board {
 }
 
 pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
-    let mut moves: Vec<(usize, usize)> = Vec::new();
+    let mut moves: Vec<(usize, usize)> = Vec::with_capacity(42);
     for (start_position, start_square) in board_state.board.iter().enumerate() {
         if let Square::MyPiece(piece_moving) = start_square {
             for move_direction in piece_moving.moves() {
