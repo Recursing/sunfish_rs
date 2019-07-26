@@ -72,7 +72,7 @@ impl Piece {
     }
 
     pub fn midgame_value(self, position: usize) -> i32 {
-        assert!(
+        debug_assert!(
             position >= BOARD_SIDE * PADDING + PADDING
                 && position < BOARD_SIZE - BOARD_SIDE * PADDING - PADDING
                 && position % BOARD_SIDE >= PADDING
