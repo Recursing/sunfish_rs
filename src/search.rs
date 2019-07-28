@@ -121,10 +121,16 @@ impl Searcher {
 
         if best < gamma {
             // Then all the other moves
-            let mut others = gen_moves(board_state);
-            others.sort_unstable_by_key(|m| -move_value(board_state, m));
-            for m in &others {
-                if depth > 0 || move_value(board_state, m) >= QUIESCENCE_SEARCH_LIMIT {
+            let others = gen_moves(board_state);
+            let mut move_vals: Vec<_> = others
+                .iter()
+                .map(|m| (-move_value(board_state, m), m))
+                .collect();
+            move_vals.sort_unstable();
+            for (val, m) in move_vals {
+                if depth > 0
+                    || (-val >= QUIESCENCE_SEARCH_LIMIT && (board_state.score - val > best))
+                {
                     let score =
                         -self.bound(&after_move(board_state, m), 1 - gamma, depth - 1, false);
                     best = std::cmp::max(best, score);
@@ -134,6 +140,8 @@ impl Searcher {
                         //println!("other: {}", best);
                         break;
                     }
+                } else {
+                    break;
                 }
             }
         }
