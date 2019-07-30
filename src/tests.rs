@@ -200,10 +200,11 @@ fn mates() {
         "r2qkb1r/ppp2ppp/2n2n2/8/2BP1P2/1Q3b2/PP4PP/RNB1K2R w KQkq - 0 9",
         "3N4/p6k/b3N1pp/3pp3/R4p2/7P/P1r3PB/6K1 b - - 1 34",
         "2rR4/p4k2/1p2p2Q/5p2/5P2/8/PPP3q1/1KB4R b - - 0 27",
+        "3r1r1k/1p2Nppp/p4n2/P1p1p3/4P3/6Pq/2P1NP2/R1B1QRK1 b - - 2 18",
     ];
 
     let mate_solutions = vec![
-        "h6g7", "a6e2", "f4f6", "d3h7", "e2f1", "b6a6", "c4f7", "f7f8", "b7f7",
+        "h6g7", "a6e2", "f4f6", "d3h7", "e2f1", "b6a6", "c4f7", "f7f8", "b7f7", "c3b5",
     ];
 
     let time_for_mate = Duration::new(10, 0); // Max time to solve, should take much less N.B. compile as --release
@@ -211,10 +212,17 @@ fn mates() {
     let mates_start_time = Instant::now();
     for (puzzle, solution) in mate_fens.iter().zip(mate_solutions) {
         let mut searcher = Searcher::default();
-        println!("{}", render_board(&from_fen(puzzle)));
-        let (top_move, score, _depth) = searcher.search(from_fen(puzzle), time_for_mate);
+        // println!("{}", render_board(&from_fen(puzzle)));
+        let mate_start_time = Instant::now();
+        let (top_move, score, depth) = searcher.search(from_fen(puzzle), time_for_mate);
+        println!(
+            "Reached depth {} in {:?} nodes {} score {}",
+            depth,
+            mate_start_time.elapsed(),
+            searcher.nodes,
+            score
+        );
         assert_eq!(render_move(&top_move), solution);
-        println!("{}", score);
         assert!(score > MATE_LOWER);
     }
     println!(
@@ -236,11 +244,20 @@ fn puzzles() {
 
     let puzzle_solutions = vec!["g2g8", "b6d7", "f3e5", "e5g6", "e6b3", "e4e5"];
 
-    let time_for_puzzle = Duration::new(2, 0);
+    let time_for_puzzle = Duration::from_millis(800);
     for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
         let mut searcher = Searcher::default();
-        let (top_move, _score, _depth) = searcher.search(from_fen(puzzle), time_for_puzzle);
-        println!("puzzle {}", solution);
+        let solve_start_time = Instant::now();
+
+        let (top_move, score, depth) = searcher.search(from_fen(puzzle), time_for_puzzle);
+        println!(
+            "Reached depth {} with score {} with nodes {} in {:?}",
+            depth,
+            score,
+            searcher.nodes,
+            solve_start_time.elapsed()
+        );
+        println!("puzzle {} solution {}", puzzle, solution);
         assert_eq!(render_move(&top_move), solution);
     }
 }
