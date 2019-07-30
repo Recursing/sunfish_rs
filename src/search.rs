@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use lru::LruCache;
 
-use crate::board::{after_move, gen_moves, move_value, nullmove, BoardState};
+use crate::board::{after_move, can_check, gen_moves, move_value, nullmove, BoardState};
 use crate::pieces::{Piece, Square};
 
 pub const MATE_UPPER: i32 = 32_000 + 8 * 2529; // TODO move somewhere else, do we need MATE_UPPER?
@@ -94,19 +94,14 @@ impl Searcher {
             let score = board_state.score;
             best = std::cmp::max(best, score);
         }
-        // Then killer move. We search it twice, but the tp will fix things for
-        // us. Note, we don't have to check for legality, since we've already
-        // done it before. Also note that in QS the killer must be a capture,
-        // otherwise we will be non deterministic.
-        let killer = self.move_transposition_table.get(board_state).cloned();
 
-        match killer {
-            None => {}
-            Some(killer_move) => {
-                if best < gamma
-                    && (depth > 0
-                        || move_value(board_state, &killer_move) >= QUIESCENCE_SEARCH_LIMIT)
-                {
+        if best <= gamma {
+            if let Some(killer_move) = self.move_transposition_table.get(board_state).copied() {
+                // Then killer move. We search it twice, but the tp will fix things for
+                // us. Note, we don't have to check for legality, since we've already
+                // done it before. Also note that in QS the killer must be a capture,
+                // otherwise we will be non deterministic.
+                if depth > 0 || move_value(board_state, &killer_move) >= QUIESCENCE_SEARCH_LIMIT {
                     let score = -self.bound(
                         &after_move(board_state, &killer_move),
                         1 - gamma,
@@ -115,6 +110,7 @@ impl Searcher {
                     );
                     best = std::cmp::max(best, score);
                     // should I add it again to the move_transposition_table?
+                    // self.move_transposition_table.put(*board_state, killer_move);
                 }
             }
         }
@@ -122,9 +118,16 @@ impl Searcher {
         if best < gamma {
             // Then all the other moves
             let others = gen_moves(board_state);
+            let check_bonus = |m| {
+                -if can_check(board_state, m) {
+                    2 * QUIESCENCE_SEARCH_LIMIT
+                } else {
+                    0
+                }
+            };
             let mut move_vals: Vec<_> = others
                 .iter()
-                .map(|m| (-move_value(board_state, m), m))
+                .map(|m| (-move_value(board_state, m) - check_bonus(m), m))
                 .collect();
             move_vals.sort_unstable();
             for (val, m) in move_vals {
@@ -137,7 +140,6 @@ impl Searcher {
                     if best >= gamma {
                         // Save the move for pv construction and killer heuristic
                         self.move_transposition_table.put(*board_state, *m);
-                        //println!("other: {}", best);
                         break;
                     }
                 } else {
