@@ -1,5 +1,5 @@
 use crate::board::{
-    rotated, static_score, BoardState, Board, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING,
+    rotate, static_score, Board, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING,
 };
 use crate::pieces::{Piece, Square};
 
@@ -140,7 +140,7 @@ pub fn from_fen(fen: &str) -> BoardState {
     let my_castling_rights = (castling.contains('Q'), castling.contains('K'));
     let opponent_castling_rights = (castling.contains('k'), castling.contains('q'));
 
-    let boardstate = BoardState {
+    let mut boardstate = BoardState {
         board: new_board,
         score: static_score(new_board),
         my_castling_rights,
@@ -148,9 +148,10 @@ pub fn from_fen(fen: &str) -> BoardState {
         en_passant_position,
         king_passant_position: None, // is not useful for legal board states
     };
-    if turn == "w" {
-        boardstate
-    } else {
-        rotated(&boardstate)
+
+    if turn == "b" {
+        rotate(&mut boardstate);
     }
+
+    boardstate
 }

@@ -80,87 +80,95 @@ impl Board {
     }
 }
 
+pub fn piece_moves(
+    board_state: &BoardState,
+    piece_moving: Piece,
+    start_position: usize,
+) -> Vec<usize> {
+    let mut reachable_squares: Vec<usize> = Vec::with_capacity(20);
+    for move_direction in piece_moving.moves() {
+        for end_position in (1..).map(|k| (start_position as i32 + move_direction * k) as usize) {
+            let destination_square = board_state.board[end_position];
+            // Illegal moves
+
+            // Hit board bounds or one of my pieces
+            match destination_square {
+                Square::Wall | Square::MyPiece(_) => break,
+                _ => {}
+            };
+
+            // Illegal pawn moves TODO write explanations
+            if piece_moving == Piece::Pawn {
+                if (*move_direction == Direction::NORTH
+                    || *move_direction == Direction::NORTH + Direction::NORTH)
+                    && destination_square != Square::Empty
+                {
+                    break;
+                }
+                if (*move_direction == Direction::NORTH + Direction::WEST
+                    || *move_direction == Direction::NORTH + Direction::EAST)
+                    && destination_square == Square::Empty
+                    && board_state.en_passant_position != Some(end_position)
+                    && board_state.king_passant_position != Some(end_position)
+                {
+                    break;
+                }
+                if *move_direction == Direction::NORTH + Direction::NORTH
+                    && (start_position < (A1 as i32 + Direction::NORTH) as usize
+                        || board_state.board[(start_position as i32 + Direction::NORTH) as usize]
+                            != Square::Empty)
+                {
+                    break;
+                }
+            }
+
+            // Move is probably fine (TODO except king stuff)
+            reachable_squares.push(end_position);
+
+            // Stop pieces that don't slide
+            if piece_moving == Piece::Pawn
+                || piece_moving == Piece::Knight
+                || piece_moving == Piece::King
+            {
+                break;
+            }
+
+            // Stop sliding after capture
+            if let Square::OpponentPiece(_) = destination_square {
+                break;
+            }
+        }
+    }
+    reachable_squares
+}
+
 pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
     let mut moves: Vec<(usize, usize)> = Vec::with_capacity(42);
     for (start_position, start_square) in board_state.board.iter().enumerate() {
         if let Square::MyPiece(piece_moving) = start_square {
-            for move_direction in piece_moving.moves() {
-                for end_position in
-                    (1..).map(|k| (start_position as i32 + move_direction * k) as usize)
+            for end_position in piece_moves(board_state, *piece_moving, start_position) {
+                // Add castling if the rook can move to the king, east castling (long or short depending on color)
+                moves.push((start_position, end_position));
+                if start_position == A1
+                    && board_state.board[(end_position as i32 + Direction::EAST) as usize]
+                        == Square::MyPiece(Piece::King)
+                    && board_state.my_castling_rights.0
                 {
-                    let destination_square = board_state.board[end_position];
-                    // Illegal moves
-
-                    // Hit board bounds or one of my pieces
-                    match destination_square {
-                        Square::Wall | Square::MyPiece(_) => break,
-                        _ => {}
-                    };
-
-                    // Illegal pawn moves TODO write explanations
-                    if piece_moving == &Piece::Pawn {
-                        if (*move_direction == Direction::NORTH
-                            || *move_direction == Direction::NORTH + Direction::NORTH)
-                            && destination_square != Square::Empty
-                        {
-                            break;
-                        }
-                        if (*move_direction == Direction::NORTH + Direction::WEST
-                            || *move_direction == Direction::NORTH + Direction::EAST)
-                            && destination_square == Square::Empty
-                            && board_state.en_passant_position != Some(end_position)
-                            && board_state.king_passant_position != Some(end_position)
-                        {
-                            break;
-                        }
-                        if *move_direction == Direction::NORTH + Direction::NORTH
-                            && (start_position < (A1 as i32 + Direction::NORTH) as usize
-                                || board_state.board
-                                    [(start_position as i32 + Direction::NORTH) as usize]
-                                    != Square::Empty)
-                        {
-                            break;
-                        }
-                    }
-
-                    // Move is probably fine (TODO except king stuff)
-                    moves.push((start_position, end_position));
-
-                    // Stop pieces that don't slide
-                    if piece_moving == &Piece::Pawn
-                        || piece_moving == &Piece::Knight
-                        || piece_moving == &Piece::King
-                    {
-                        break;
-                    }
-
-                    // Stop sliding after capture
-                    if let Square::OpponentPiece(_) = destination_square {
-                        break;
-                    }
-
-                    // Add castling if the rook can move to the king, east castling (long or short depending on color)
-                    if start_position == A1
-                        && board_state.board[(end_position as i32 + Direction::EAST) as usize]
-                            == Square::MyPiece(Piece::King)
-                        && board_state.my_castling_rights.0
-                    {
-                        moves.push((
-                            (end_position as i32 + Direction::EAST) as usize,
-                            (end_position as i32 + Direction::WEST) as usize,
-                        ))
-                    }
-                    // Add castling if the rook can move to the king, west castling (long or short depending on color)
-                    else if start_position == H1
-                        && board_state.board[(end_position as i32 + Direction::WEST) as usize]
-                            == Square::MyPiece(Piece::King)
-                        && board_state.my_castling_rights.1
-                    {
-                        moves.push((
-                            (end_position as i32 + Direction::WEST) as usize,
-                            (end_position as i32 + Direction::EAST) as usize,
-                        ))
-                    }
+                    moves.push((
+                        (end_position as i32 + Direction::EAST) as usize,
+                        (end_position as i32 + Direction::WEST) as usize,
+                    ))
+                }
+                // Add castling if the rook can move to the king, west castling (long or short depending on color)
+                else if start_position == H1
+                    && board_state.board[(end_position as i32 + Direction::WEST) as usize]
+                        == Square::MyPiece(Piece::King)
+                    && board_state.my_castling_rights.1
+                {
+                    moves.push((
+                        (end_position as i32 + Direction::WEST) as usize,
+                        (end_position as i32 + Direction::EAST) as usize,
+                    ))
                 }
             }
         }
@@ -168,28 +176,33 @@ pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
     moves
 }
 
-pub fn rotated(board_state: &BoardState) -> BoardState {
-    let mut new_board: Board = Board([Square::Empty; BOARD_SIZE]);
-    for (coordinate, square) in new_board.iter_mut().enumerate() {
-        *square = match board_state.board[BOARD_SIZE - 1 - coordinate] {
-            Square::Empty => Square::Empty,
-            Square::Wall => Square::Wall,
-            Square::MyPiece(p) => Square::OpponentPiece(p),
-            Square::OpponentPiece(p) => Square::MyPiece(p),
-        };
+fn swap_color(square: Square) -> Square {
+    match square {
+        Square::Empty => Square::Empty,
+        Square::Wall => Square::Wall,
+        Square::MyPiece(p) => Square::OpponentPiece(p),
+        Square::OpponentPiece(p) => Square::MyPiece(p),
     }
-    BoardState {
-        board: new_board,
-        score: -board_state.score,
-        my_castling_rights: board_state.opponent_castling_rights,
-        opponent_castling_rights: board_state.my_castling_rights,
-        en_passant_position: board_state
-            .en_passant_position
-            .map(|ep| BOARD_SIZE - 1 - ep),
-        king_passant_position: board_state
-            .king_passant_position
-            .map(|kp| BOARD_SIZE - 1 - kp),
+}
+
+pub fn rotate(board_state: &mut BoardState) {
+    let total_padding = PADDING * BOARD_SIDE + PADDING;
+    for coordinate in total_padding..(BOARD_SIZE / 2) {
+        let old_val = board_state.board[coordinate];
+        board_state.board[coordinate] = swap_color(board_state.board[BOARD_SIZE - 1 - coordinate]);
+        board_state.board[BOARD_SIZE - 1 - coordinate] = swap_color(old_val);
     }
+    board_state.score = -board_state.score;
+    std::mem::swap(
+        &mut board_state.my_castling_rights,
+        &mut board_state.opponent_castling_rights,
+    );
+    board_state.en_passant_position = board_state
+        .en_passant_position
+        .map(|ep| BOARD_SIZE - 1 - ep);
+    board_state.king_passant_position = board_state
+        .king_passant_position
+        .map(|kp| BOARD_SIZE - 1 - kp);
 }
 
 // Like rotate, but clears ep and kp
@@ -270,14 +283,30 @@ pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardStat
         }
     }
 
-    rotated(&BoardState {
+    let mut new_board_state = BoardState {
         board: new_board,
         score: board_state.score + move_value(board_state, &move_),
         my_castling_rights,
         opponent_castling_rights,
         king_passant_position,
         en_passant_position,
-    })
+    };
+    rotate(&mut new_board_state);
+    new_board_state
+}
+
+pub fn can_check(board_state: &BoardState, move_: &(usize, usize)) -> bool {
+    let (start_position, end_position) = *move_;
+    if let Square::MyPiece(moved_piece) = board_state.board[start_position] {
+        for reachable_square in piece_moves(board_state, moved_piece, end_position) {
+            if board_state.board[reachable_square] == Square::OpponentPiece(Piece::King) {
+                return true;
+            }
+        }
+        false
+    } else {
+        panic!();
+    }
 }
 
 pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
