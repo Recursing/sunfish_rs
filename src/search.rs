@@ -119,7 +119,7 @@ impl Searcher {
             // Then all the other moves
             let others = gen_moves(board_state);
             let check_bonus = |m| {
-                -if can_check(board_state, m) {
+                if can_check(board_state, m) {
                     2 * QUIESCENCE_SEARCH_LIMIT
                 } else {
                     0
