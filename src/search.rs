@@ -78,14 +78,11 @@ impl Searcher {
         // First try not moving at all
         if depth > 0
             && !root
-            && (board_state.board.iter().any(|&s| match s {
-                // TODO maybe base it on the board score?
-                Square::MyPiece(Piece::Rook)
+            // TODO maybe base it on the board score?
+            && (board_state.board.iter().any(|&s| matches!(s, Square::MyPiece(Piece::Rook)
                 | Square::MyPiece(Piece::Knight)
                 | Square::MyPiece(Piece::Bishop)
-                | Square::MyPiece(Piece::Queen) => true,
-                _ => false,
-            }))
+                | Square::MyPiece(Piece::Queen))))
         {
             let score = -self.bound(&nullmove(board_state), 1 - gamma, depth - 3, false);
             best = std::cmp::max(best, score);

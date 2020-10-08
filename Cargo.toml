@@ -5,7 +5,7 @@ authors = ["Recursing <buonanno.lorenzo@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-lru = "0.1"
+lru = "0.6"
 log = "0.4"
 simplelog = "0.6"
 

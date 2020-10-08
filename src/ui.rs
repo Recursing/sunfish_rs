@@ -1,6 +1,4 @@
-use crate::board::{
-    rotate, static_score, Board, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING,
-};
+use crate::board::{rotate, static_score, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING};
 use crate::pieces::{Piece, Square};
 
 pub fn parse_move(move_: &str) -> (usize, usize) {
@@ -87,7 +85,7 @@ pub fn render_board(board_state: &BoardState) -> String {
 
 // https://en.wikipedia.org/wiki/Forsyth%E2%80%93Edwards_Notation#Definition
 pub fn from_fen(fen: &str) -> BoardState {
-    let mut new_board = Board::new([Square::Empty; BOARD_SIZE]);
+    let mut new_board = [Square::Empty; BOARD_SIZE];
     let fields = fen.split(' ').collect::<Vec<_>>();
     let mut board_string: String = fields[0].into();
     let (turn, castling, en_passant, _halfmoves, _fullmoves) =

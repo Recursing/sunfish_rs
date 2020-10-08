@@ -1,7 +1,6 @@
 use crate::pieces::{Direction, Piece, Square};
 use std::fmt::Debug;
-use std::hash::{Hash, Hasher};
-use std::ops::{Index, IndexMut};
+use std::hash::Hash;
 
 pub const PADDING: usize = 2;
 pub const BOARD_SIDE: usize = 8 + 2 * PADDING;
@@ -14,70 +13,12 @@ const H1: usize = A1 + 7;
 
 #[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 pub struct BoardState {
-    pub board: Board,
+    pub board: [Square; BOARD_SIZE],
     pub score: i32,
     pub my_castling_rights: (bool, bool), // first west, second east
     pub opponent_castling_rights: (bool, bool), // first west, second east
     pub en_passant_position: Option<usize>, // square where I can en passant
     pub king_passant_position: Option<usize>, // square where I could capture the king, used to treat castling as en passant
-}
-
-#[derive(Clone, Copy)]
-pub struct Board([Square; BOARD_SIZE]);
-
-impl Index<usize> for Board {
-    type Output = Square;
-
-    fn index(&self, location: usize) -> &Square {
-        self.0.index(location)
-    }
-}
-
-impl IndexMut<usize> for Board {
-    fn index_mut(&mut self, location: usize) -> &mut Square {
-        self.0.index_mut(location)
-    }
-}
-
-impl PartialEq for Board {
-    fn eq(&self, rhs: &Board) -> bool {
-        self.0[..] == rhs.0[..]
-    }
-}
-
-impl Eq for Board {}
-
-impl Hash for Board {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
-    }
-}
-
-impl Debug for Board {
-    fn fmt(
-        &self,
-        formatter: &mut std::fmt::Formatter<'_>,
-    ) -> std::result::Result<(), std::fmt::Error> {
-        self.0[..].fmt(formatter)
-    }
-}
-
-impl Board {
-    pub fn new(board: [Square; BOARD_SIZE]) -> Board {
-        Board(board)
-    }
-
-    pub fn iter(&self) -> std::slice::Iter<'_, Square> {
-        self.0.iter()
-    }
-
-    pub fn chunks(&self, size: usize) -> std::slice::Chunks<'_, Square> {
-        self.0.chunks(size)
-    }
-
-    fn iter_mut(&mut self) -> std::slice::IterMut<'_, Square> {
-        self.0.iter_mut()
-    }
 }
 
 pub fn piece_moves(
@@ -207,7 +148,7 @@ pub fn rotate(board_state: &mut BoardState) {
 
 // Like rotate, but clears ep and kp
 pub fn nullmove(board_state: &BoardState) -> BoardState {
-    let mut new_board: Board = Board([Square::Empty; BOARD_SIZE]);
+    let mut new_board = [Square::Empty; BOARD_SIZE];
     for (coordinate, square) in new_board.iter_mut().enumerate() {
         *square = match board_state.board[BOARD_SIZE - 1 - coordinate] {
             Square::Empty => Square::Empty,
@@ -368,7 +309,7 @@ pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
     temp_score
 }
 
-pub fn static_score(board: Board) -> i32 {
+pub fn static_score(board: [Square; BOARD_SIZE]) -> i32 {
     board
         .iter()
         .enumerate()
@@ -538,7 +479,7 @@ const INITIAL_BOARD: [Square; BOARD_SIZE] = [
 ];
 
 pub const INITIAL_BOARD_STATE: BoardState = BoardState {
-    board: Board(INITIAL_BOARD),
+    board: INITIAL_BOARD,
     score: 0,
     my_castling_rights: (true, true),
     opponent_castling_rights: (true, true),
