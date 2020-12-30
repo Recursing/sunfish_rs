@@ -1,6 +1,5 @@
 use crate::pieces::{Direction, Piece, Square};
 use std::fmt::Debug;
-use std::hash::Hash;
 
 pub const PADDING: usize = 2;
 pub const BOARD_SIDE: usize = 8 + 2 * PADDING;

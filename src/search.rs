@@ -1,15 +1,14 @@
 use log::info;
 use std::cmp::max;
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
-
-use lru::LruCache;
 
 use crate::board::{after_move, can_check, gen_moves, move_value, nullmove, BoardState};
 use crate::pieces::{Piece, Square};
 
 pub const MATE_UPPER: i32 = 32_000 + 8 * 2529; // TODO move somewhere else, do we need MATE_UPPER?
 pub const MATE_LOWER: i32 = 32_000 - 8 * 2529;
-const TRANSPOSITION_TABLE_SIZE: usize = 5_000_000; // TODO explain, make more space efficient
+const TRANSPOSITION_TABLE_SIZE: usize = 500_000; // TODO explain, make more space efficient
 const QUIESCENCE_SEARCH_LIMIT: i32 = 130;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 
@@ -26,16 +25,16 @@ const DEFAULT_ENTRY: Entry = Entry {
 };
 
 pub struct Searcher {
-    pub score_transposition_table: LruCache<(BoardState, i32, bool), Entry>,
-    pub move_transposition_table: LruCache<BoardState, (usize, usize)>,
+    pub score_transposition_table: HashMap<(BoardState, i32, bool), Entry>,
+    pub move_transposition_table: HashMap<BoardState, (usize, usize)>,
     pub nodes: u32,
 }
 
 impl Default for Searcher {
     fn default() -> Self {
         Searcher {
-            score_transposition_table: LruCache::new(TRANSPOSITION_TABLE_SIZE),
-            move_transposition_table: LruCache::new(TRANSPOSITION_TABLE_SIZE),
+            score_transposition_table: HashMap::with_capacity(TRANSPOSITION_TABLE_SIZE),
+            move_transposition_table: HashMap::with_capacity(TRANSPOSITION_TABLE_SIZE),
             nodes: 0,
         }
     }
@@ -107,7 +106,7 @@ impl Searcher {
                     );
                     best = std::cmp::max(best, score);
                     // should I add it again to the move_transposition_table?
-                    // self.move_transposition_table.put(*board_state, killer_move);
+                    // self.move_transposition_table.insert(*board_state, killer_move);
                 }
             }
         }
@@ -136,7 +135,10 @@ impl Searcher {
                     best = std::cmp::max(best, score);
                     if best >= gamma {
                         // Save the move for pv construction and killer heuristic
-                        self.move_transposition_table.put(*board_state, *m);
+                        if self.move_transposition_table.len() >= TRANSPOSITION_TABLE_SIZE {
+                            self.move_transposition_table.clear();
+                        }
+                        self.move_transposition_table.insert(*board_state, *m);
                         break;
                     }
                 } else {
@@ -171,8 +173,11 @@ impl Searcher {
         }
 
         // Update score_transposition_table
+        if self.score_transposition_table.len() >= TRANSPOSITION_TABLE_SIZE {
+            self.score_transposition_table.clear();
+        }
         if best >= gamma {
-            self.score_transposition_table.put(
+            self.score_transposition_table.insert(
                 (*board_state, depth, root),
                 Entry {
                     lower: best,
@@ -180,7 +185,7 @@ impl Searcher {
                 },
             );
         } else if best < gamma {
-            self.score_transposition_table.put(
+            self.score_transposition_table.insert(
                 (*board_state, depth, root),
                 Entry {
                     lower: entry.lower,
@@ -253,7 +258,7 @@ impl Searcher {
         // TODO there's probably a better way
         for depth in 1..30 {
             self.score_transposition_table
-                .put((*board_state, depth, false), Entry { lower: 0, upper: 0 });
+                .insert((*board_state, depth, false), Entry { lower: 0, upper: 0 });
         }
     }
 }
