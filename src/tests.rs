@@ -240,11 +240,17 @@ fn puzzles() {
         "r1bq1rk1/1p3pp1/p2p1n1p/2b1p3/2PnP3/P1NB4/1P1QNPPP/R1B2RK1 b - - 0 12",
         "1r4k1/pp1r1p1p/2pp1P1Q/6P1/8/3q4/P5BP/4R1K1 b - - 1 27",
         "r2q1rk1/1p3ppp/p2bb3/3pn3/8/P1N1Q3/1PP1BPPP/R1B2RK1 b - - 9 16",
+        "r2q1rk1/1b2b1pp/p1p1p3/2npPp2/3N1P2/2N1B3/PPP3PP/2RQ1RK1 w - - 0 1",
+        "r2qkb1r/5ppp/2np1n2/1N2p1B1/2b1P3/2N2P2/PPP3PP/R2QR1K1 b kq - 0 1",
+        "3r1rk1/1p4pp/2p2p2/p1b1BQ2/1qP5/1B1P3P/PP4P1/R6K w - - 0 22",
+        "8/6pk/3r1qpp/4N2P/3PQ3/8/5PP1/6K1 w - - 1 41",
+        "2kr3r/pp2nppp/4p3/2p1Nq2/P7/2P5/1PnB1PPP/R2QR1K1 w - - 1 19",
     ];
 
-    let puzzle_solutions = vec!["g2g8", "b6d7", "f3e5", "e5g6", "e6b3", "e4e5"];
-
-    let time_for_puzzle = Duration::from_millis(800);
+    let puzzle_solutions = vec![
+        "g2g8", "b6d7", "f3e5", "e5g6", "e6b3", "e4e5", "b2b4", "f5g4", "e5c3", "h5g6", "g2g4",
+    ];
+    let time_for_puzzle = Duration::from_millis(1600);
     for (puzzle, solution) in puzzle_fens.iter().zip(puzzle_solutions) {
         let mut searcher = Searcher::default();
         let solve_start_time = Instant::now();

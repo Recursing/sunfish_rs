@@ -14,11 +14,11 @@ fn read_line() -> String {
 }
 
 pub fn uci_loop() {
-    let mut searcher = Searcher::default();
     println!("Sunfish_rs");
     let mut board_state = INITIAL_BOARD_STATE;
     let mut am_black = false;
     loop {
+        let mut searcher = Searcher::default();
         let next_command = read_line();
         trace!("Received command {}", next_command);
         match next_command.split(' ').next().unwrap() {
@@ -86,7 +86,7 @@ pub fn uci_loop() {
                 };
 
                 let mut nanos_for_move: i64 =
-                    i64::from(time_difference + increment - 10_000) * 1_000_000 / 2;
+                    i64::from(time_difference + increment - 1_000) * 1_000_000;
 
                 if nanos_for_move > 1_000_000_000 {
                     nanos_for_move -= 200_000_000 // Account for lag

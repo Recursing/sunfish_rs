@@ -11,6 +11,7 @@ pub const MATE_LOWER: i32 = 32_000 - 8 * 2529;
 const TRANSPOSITION_TABLE_SIZE: usize = 500_000; // TODO explain, make more space efficient
 const QUIESCENCE_SEARCH_LIMIT: i32 = 130;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
+const STOP_SEARCH: i32 = MATE_UPPER * 101;
 
 #[derive(Clone, Copy)]
 pub struct Entry {
@@ -28,6 +29,8 @@ pub struct Searcher {
     pub score_transposition_table: HashMap<(BoardState, i32, bool), Entry>,
     pub move_transposition_table: HashMap<BoardState, (usize, usize)>,
     pub nodes: u32,
+    now: Instant,
+    duration: Duration,
 }
 
 impl Default for Searcher {
@@ -36,6 +39,8 @@ impl Default for Searcher {
             score_transposition_table: HashMap::with_capacity(TRANSPOSITION_TABLE_SIZE),
             move_transposition_table: HashMap::with_capacity(TRANSPOSITION_TABLE_SIZE),
             nodes: 0,
+            now: Instant::now(),
+            duration: Duration::new(4, 0),
         }
     }
 }
@@ -73,6 +78,10 @@ impl Searcher {
             return entry.upper;
         }
 
+        if self.now.elapsed() > self.duration {
+            return STOP_SEARCH;
+        }
+
         let mut best = -MATE_UPPER;
         // First try not moving at all
         if depth > 0
@@ -84,6 +93,9 @@ impl Searcher {
                 | Square::MyPiece(Piece::Queen))))
         {
             let score = -self.bound(&nullmove(board_state), 1 - gamma, depth - 3, false);
+            if score == -STOP_SEARCH {
+                return STOP_SEARCH;
+            }
             best = std::cmp::max(best, score);
         } else if depth <= 0 {
             // For QSearch we have a different kind of null-move
@@ -104,6 +116,9 @@ impl Searcher {
                         depth - 1,
                         false,
                     );
+                    if score == -STOP_SEARCH {
+                        return STOP_SEARCH;
+                    }
                     best = std::cmp::max(best, score);
                     // should I add it again to the move_transposition_table?
                     // self.move_transposition_table.insert(*board_state, killer_move);
@@ -116,7 +131,7 @@ impl Searcher {
             let others = gen_moves(board_state);
             let check_bonus = |m| {
                 if can_check(board_state, m) {
-                    2 * QUIESCENCE_SEARCH_LIMIT
+                    QUIESCENCE_SEARCH_LIMIT >> 2
                 } else {
                     0
                 }
@@ -132,6 +147,9 @@ impl Searcher {
                 {
                     let score =
                         -self.bound(&after_move(board_state, m), 1 - gamma, depth - 1, false);
+                    if score == -STOP_SEARCH {
+                        return STOP_SEARCH;
+                    }
                     best = std::cmp::max(best, score);
                     if best >= gamma {
                         // Save the move for pv construction and killer heuristic
@@ -204,8 +222,10 @@ impl Searcher {
         duration: Duration,
     ) -> ((usize, usize), i32, i32) {
         self.nodes = 0;
-        let mut reached_depth = 0;
-        let now = Instant::now();
+        let mut reached_depth;
+        self.now = Instant::now();
+        self.duration = duration;
+        let mut last_move = ((0, 0), 0, 0);
 
         // Bound depth to avoid infinite recursion in finished games
         for depth in 1..99 {
@@ -215,42 +235,54 @@ impl Searcher {
             while lower < upper - EVAL_ROUGHNESS {
                 let gamma = (lower + upper + 1) / 2;
                 let score = self.bound(&board_state, gamma, depth, true);
+                if score == STOP_SEARCH {
+                    lower = STOP_SEARCH;
+                    break;
+                }
                 if score >= gamma {
                     lower = score;
                 } else {
                     upper = score;
                 }
             }
-
+            if lower == STOP_SEARCH {
+                break;
+            }
             let score = self.bound(&board_state, lower, depth, true);
+            if score == STOP_SEARCH {
+                break;
+            }
             reached_depth = depth;
             info!(
                 "Reached depth {: <2} score {: <5} nodes {: <7} time {:?}",
                 depth,
                 score,
                 self.nodes,
-                now.elapsed()
+                self.now.elapsed()
             );
 
-            if now.elapsed() > duration || score > MATE_LOWER {
+            // If the game hasn't finished we can retrieve our move from the
+            // transposition table.
+
+            last_move = (
+                *self
+                    .move_transposition_table
+                    .get(&board_state)
+                    .expect("move not in table"),
+                self.score_transposition_table
+                    .get(&(board_state, reached_depth, true))
+                    .expect("score not in table")
+                    .lower,
+                reached_depth,
+            );
+
+            if self.now.elapsed() > self.duration || score > MATE_LOWER {
                 // Don't waste time if a mate is found
                 break;
             }
         }
 
-        // If the game hasn't finished we can retrieve our move from the
-        // transposition table.
-        (
-            *self
-                .move_transposition_table
-                .get(&board_state)
-                .expect("move not in table"),
-            self.score_transposition_table
-                .get(&(board_state, reached_depth, true))
-                .expect("score not in table")
-                .lower,
-            reached_depth,
-        )
+        last_move
     }
 
     // Done to prevent move repetitions
