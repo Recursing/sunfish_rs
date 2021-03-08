@@ -1,5 +1,5 @@
 use crate::board::{rotate, static_score, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING};
-use crate::pieces::{Piece, Square};
+use crate::pieces::Square;
 
 pub fn parse_move(move_: &str) -> (usize, usize) {
     let from = parse_coordinates(&move_[..2]);
@@ -28,18 +28,18 @@ fn render_coordinates(position: usize) -> String {
 impl Square {
     pub fn to_unicode(self) -> char {
         match self {
-            Square::MyPiece(Piece::Rook) => '♜',
-            Square::MyPiece(Piece::Knight) => '♞',
-            Square::MyPiece(Piece::Bishop) => '♝',
-            Square::MyPiece(Piece::Queen) => '♛',
-            Square::MyPiece(Piece::King) => '♚',
-            Square::MyPiece(Piece::Pawn) => '♟',
-            Square::OpponentPiece(Piece::Rook) => '♖',
-            Square::OpponentPiece(Piece::Knight) => '♘',
-            Square::OpponentPiece(Piece::Bishop) => '♗',
-            Square::OpponentPiece(Piece::Queen) => '♕',
-            Square::OpponentPiece(Piece::King) => '♔',
-            Square::OpponentPiece(Piece::Pawn) => '♙',
+            Square::MyRook => '♜',
+            Square::MyKnight => '♞',
+            Square::MyBishop => '♝',
+            Square::MyQueen => '♛',
+            Square::MyKing => '♚',
+            Square::MyPawn => '♟',
+            Square::OpponentRook => '♖',
+            Square::OpponentKnight => '♘',
+            Square::OpponentBishop => '♗',
+            Square::OpponentQueen => '♕',
+            Square::OpponentKing => '♔',
+            Square::OpponentPawn => '♙',
             Square::Empty => '·',
             Square::Wall => 'X',
         }
@@ -111,18 +111,18 @@ pub fn from_fen(fen: &str) -> BoardState {
                 Square::Wall
             } else {
                 match board_lines[rank - PADDING][file - PADDING] {
-                    'P' => Square::MyPiece(Piece::Pawn),
-                    'N' => Square::MyPiece(Piece::Knight),
-                    'B' => Square::MyPiece(Piece::Bishop),
-                    'R' => Square::MyPiece(Piece::Rook),
-                    'Q' => Square::MyPiece(Piece::Queen),
-                    'K' => Square::MyPiece(Piece::King),
-                    'p' => Square::OpponentPiece(Piece::Pawn),
-                    'n' => Square::OpponentPiece(Piece::Knight),
-                    'b' => Square::OpponentPiece(Piece::Bishop),
-                    'r' => Square::OpponentPiece(Piece::Rook),
-                    'q' => Square::OpponentPiece(Piece::Queen),
-                    'k' => Square::OpponentPiece(Piece::King),
+                    'P' => Square::MyPawn,
+                    'N' => Square::MyKnight,
+                    'B' => Square::MyBishop,
+                    'R' => Square::MyRook,
+                    'Q' => Square::MyQueen,
+                    'K' => Square::MyKing,
+                    'p' => Square::OpponentPawn,
+                    'n' => Square::OpponentKnight,
+                    'b' => Square::OpponentBishop,
+                    'r' => Square::OpponentRook,
+                    'q' => Square::OpponentQueen,
+                    'k' => Square::OpponentKing,
                     _ => Square::Empty,
                 }
             }

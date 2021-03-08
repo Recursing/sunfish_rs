@@ -2,7 +2,7 @@ use log::{info, trace, warn};
 use std::time::Duration;
 
 use crate::board::{after_move, gen_moves, A8, BOARD_SIZE, H8, INITIAL_BOARD_STATE};
-use crate::pieces::{Piece, Square};
+use crate::pieces::Square;
 use crate::search::Searcher;
 use crate::ui::{parse_move, render_move};
 
@@ -109,7 +109,7 @@ pub fn uci_loop() {
                 // TODO parse_movetime
                 let (mut top_move, _score, _depth) = searcher.search(board_state, time_for_move);
                 let is_promotion = (A8 <= top_move.1 && top_move.1 <= H8)
-                    && board_state.board[top_move.0] == Square::MyPiece(Piece::Pawn);
+                    && board_state.board[top_move.0] == Square::MyPawn;
                 if am_black {
                     top_move.0 = BOARD_SIZE - 1 - top_move.0;
                     top_move.1 = BOARD_SIZE - 1 - top_move.1;

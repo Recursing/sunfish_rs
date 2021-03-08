@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use crate::board::{after_move, can_check, gen_moves, move_value, nullmove, BoardState};
-use crate::pieces::{Piece, Square};
+use crate::pieces::Square;
 
 pub const MATE_UPPER: i32 = 32_000 + 8 * 2529; // TODO move somewhere else, do we need MATE_UPPER?
 pub const MATE_LOWER: i32 = 32_000 - 8 * 2529;
-const TRANSPOSITION_TABLE_SIZE: usize = 500_000; // TODO explain, make more space efficient
+const TRANSPOSITION_TABLE_SIZE: usize = 1_000_000; // TODO explain, make more space efficient
 const QUIESCENCE_SEARCH_LIMIT: i32 = 130;
 const EVAL_ROUGHNESS: i32 = 10; // TODO do we need this?
 const STOP_SEARCH: i32 = MATE_UPPER * 101;
@@ -87,10 +87,10 @@ impl Searcher {
         if depth > 0
             && !root
             // TODO maybe base it on the board score?
-            && (board_state.board.iter().any(|&s| matches!(s, Square::MyPiece(Piece::Rook)
-                | Square::MyPiece(Piece::Knight)
-                | Square::MyPiece(Piece::Bishop)
-                | Square::MyPiece(Piece::Queen))))
+            && (board_state.board.iter().any(|&s| matches!(s, Square::MyRook
+                | Square::MyKnight
+                | Square::MyBishop
+                | Square::MyQueen)))
         {
             let score = -self.bound(&nullmove(board_state), 1 - gamma, depth - 3, false);
             if score == -STOP_SEARCH {

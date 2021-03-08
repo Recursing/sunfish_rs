@@ -10,33 +10,77 @@ impl Direction {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub enum Piece {
-    Pawn,
-    Knight,
-    Bishop,
-    Rook,
-    Queen,
-    King,
-}
-
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
+#[repr(u8)]
 pub enum Square {
-    MyPiece(Piece),
-    OpponentPiece(Piece),
-    Empty,
-    Wall, // Here to simplify detection of out of board moves
+    MyPawn = 0x01,
+    MyKnight = 0x02,
+    MyBishop = 0x03,
+    MyRook = 0x04,
+    MyQueen = 0x05,
+    MyKing = 0x06,
+    OpponentPawn = 0x11,
+    OpponentKnight = 0x12,
+    OpponentBishop = 0x13,
+    OpponentRook = 0x14,
+    OpponentQueen = 0x15,
+    OpponentKing = 0x16,
+    Empty = 0xFE,
+    Wall = 0xFF, // Here to simplify detection of out of board moves
 }
 
-impl Piece {
+impl Square {
+    pub fn is_my_piece(self) -> bool {
+        matches!(
+            self,
+            Square::MyPawn
+                | Square::MyKing
+                | Square::MyRook
+                | Square::MyKnight
+                | Square::MyBishop
+                | Square::MyQueen
+        )
+    }
+
+    pub fn is_opponent_piece(self) -> bool {
+        matches!(
+            self,
+            Square::OpponentPawn
+                | Square::OpponentKing
+                | Square::OpponentRook
+                | Square::OpponentKnight
+                | Square::OpponentBishop
+                | Square::OpponentQueen
+        )
+    }
+
+    pub fn swap_color(self) -> Square {
+        match self {
+            Square::Empty => Square::Empty,
+            Square::Wall => Square::Wall,
+            Square::MyPawn => Square::OpponentPawn,
+            Square::MyKing => Square::OpponentKing,
+            Square::MyRook => Square::OpponentRook,
+            Square::MyKnight => Square::OpponentKnight,
+            Square::MyBishop => Square::OpponentBishop,
+            Square::MyQueen => Square::OpponentQueen,
+            Square::OpponentPawn => Square::MyPawn,
+            Square::OpponentKing => Square::MyKing,
+            Square::OpponentRook => Square::MyRook,
+            Square::OpponentKnight => Square::MyKnight,
+            Square::OpponentBishop => Square::MyBishop,
+            Square::OpponentQueen => Square::MyQueen,
+        }
+    }
+
     pub fn moves(self) -> &'static [i32] {
         match self {
-            Piece::Pawn => &[
+            Square::MyPawn => &[
                 Direction::NORTH,
                 Direction::NORTH + Direction::NORTH,
                 Direction::NORTH + Direction::WEST,
                 Direction::NORTH + Direction::EAST,
             ],
-            Piece::Knight => &[
+            Square::MyKnight => &[
                 Direction::NORTH + Direction::NORTH + Direction::EAST,
                 Direction::NORTH + Direction::NORTH + Direction::WEST,
                 Direction::WEST + Direction::WEST + Direction::NORTH,
@@ -46,19 +90,19 @@ impl Piece {
                 Direction::EAST + Direction::EAST + Direction::SOUTH,
                 Direction::EAST + Direction::EAST + Direction::NORTH,
             ],
-            Piece::Bishop => &[
+            Square::MyBishop => &[
                 Direction::NORTH + Direction::EAST,
                 Direction::NORTH + Direction::WEST,
                 Direction::WEST + Direction::SOUTH,
                 Direction::SOUTH + Direction::EAST,
             ],
-            Piece::Rook => &[
+            Square::MyRook => &[
                 Direction::NORTH,
                 Direction::WEST,
                 Direction::SOUTH,
                 Direction::EAST,
             ],
-            Piece::Queen | Piece::King => &[
+            Square::MyQueen | Square::MyKing => &[
                 Direction::NORTH,
                 Direction::WEST,
                 Direction::SOUTH,
@@ -68,6 +112,7 @@ impl Piece {
                 Direction::WEST + Direction::SOUTH,
                 Direction::SOUTH + Direction::EAST,
             ],
+            _ => panic!(),
         }
     }
 
@@ -84,17 +129,18 @@ impl Piece {
 
         // From stockfish /src/types.h#L182,
         let piece_value = match self {
-            Piece::Pawn => 136,
-            Piece::Knight => 782,
-            Piece::Bishop => 830,
-            Piece::Rook => 1289,
-            Piece::Queen => 2529,
-            Piece::King => 32000,
+            Square::MyPawn => 136,
+            Square::MyKnight => 782,
+            Square::MyBishop => 830,
+            Square::MyRook => 1289,
+            Square::MyQueen => 2529,
+            Square::MyKing => 32000,
+            _ => panic!(),
         };
 
         // From stockfish /src/psqt.cpp#L31
         let piece_position_value = match self {
-            Piece::Pawn => &[
+            Square::MyPawn => &[
                 0, 0, 0, 0, 0, 0, 0, 0, // Last rank, no pawns
                 15, 31, 20, 14, 23, 11, 37, 24, //
                 -1, -3, 15, 26, 1, 10, -7, -9, //
@@ -104,7 +150,7 @@ impl Piece {
                 2, 0, 15, 3, 11, 22, 11, -1, //
                 0, 0, 0, 0, 0, 0, 0, 0,
             ],
-            Piece::Knight => &[
+            Square::MyKnight => &[
                 -200, -80, -53, -32, -32, -53, -80, -200, //
                 -67, -21, 6, 37, 37, 6, -21, -67, //
                 -11, 28, 63, 55, 55, 63, 28, -11, //
@@ -114,7 +160,7 @@ impl Piece {
                 -79, -39, -24, -9, -9, -24, -39, -79, //
                 -169, -96, -80, -79, -79, -80, -96, -169, //
             ],
-            Piece::Bishop => &[
+            Square::MyBishop => &[
                 -48, -3, -12, -25, -25, -12, -3, -48, //
                 -21, -19, 10, -6, -6, 10, -19, -21, //
                 -17, 4, -1, 8, 8, -1, 4, -17, //
@@ -124,7 +170,7 @@ impl Piece {
                 -18, 7, 14, 3, 3, 14, 7, -18, //
                 -44, -4, -11, -28, -28, -11, -4, -44, //
             ],
-            Piece::Rook => &[
+            Square::MyRook => &[
                 -22, -24, -6, 4, 4, -6, -24, -22, //
                 -8, 6, 10, 12, 12, 10, 6, -8, //
                 -24, -4, 4, 10, 10, 4, -4, -24, //
@@ -134,7 +180,7 @@ impl Piece {
                 -18, -10, -5, 9, 9, -5, -10, -18, //
                 -24, -13, -7, 2, 2, -7, -13, -24, //
             ],
-            Piece::Queen => &[
+            Square::MyQueen => &[
                 -2, -2, 1, -2, -2, 1, -2, -2, //
                 -5, 6, 10, 8, 8, 10, 6, -5, //
                 -4, 10, 6, 8, 8, 6, 10, -4, //
@@ -144,7 +190,7 @@ impl Piece {
                 -3, 5, 8, 12, 12, 8, 5, -3, //
                 3, -5, -5, 4, 4, -5, -5, 3, //
             ],
-            Piece::King => &[
+            Square::MyKing => &[
                 6, 8, 4, 0, 0, 4, 8, 6, //
                 8, 12, 6, 2, 2, 6, 12, 8, //
                 12, 15, 8, 3, 3, 8, 15, 12, //
@@ -154,6 +200,7 @@ impl Piece {
                 27, 30, 24, 18, 18, 24, 30, 27, //
                 27, 32, 27, 19, 19, 27, 32, 27, //
             ],
+            _ => &[0; 64],
         };
         let real_position = position - PADDING * BOARD_SIDE;
         let row_number = real_position / BOARD_SIDE;
