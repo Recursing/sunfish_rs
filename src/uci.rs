@@ -86,14 +86,20 @@ pub fn uci_loop() {
                 };
 
                 let mut nanos_for_move: i64 =
-                    i64::from(time_difference + increment - 1_000) * 1_000_000;
+                    i64::from(time_difference + increment - 3_000) * 1_000_000;
 
-                if nanos_for_move > 1_000_000_000 {
+                if nanos_for_move < (increment * 800_000).into() {
+                    nanos_for_move = (increment * 800_000).into();
+                }
+
+                if nanos_for_move > 40_000_000 {
+                    nanos_for_move = 40_000_000;
+                }
+
+                if nanos_for_move > 1_700_000_000 {
                     nanos_for_move -= 200_000_000 // Account for lag
-                } else if nanos_for_move > 500_000_000 {
-                    nanos_for_move = 500_000_000 // Minimum reasonable move time
                 } else {
-                    nanos_for_move = 250_000_000 // Minimum unreasonable move time
+                    nanos_for_move = 500_000_000 // Minimum reasonable move time
                 }
 
                 let time_for_move = Duration::new(
