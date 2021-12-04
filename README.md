@@ -13,4 +13,4 @@ Challenge it on [lichess](https://lichess.org/@/sunfish_rs) and tell me what you
 - Support endgame values (ideally tapered eval), might be tricky to do with incremental updates
 - Add more tests, need to test many more positions and add more unit tests
 - Benchmarking, maybe build a micro benchmarking framework? See https://github.com/bheisler/criterion.rs/issues/306
-[x] Make Square enums more compact, currently they use twice as much memory as the python chars :/
+- [x] Make Square enums more compact, currently they use twice as much memory as the python chars :/
