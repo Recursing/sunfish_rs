@@ -11,6 +11,7 @@ impl Direction {
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 #[repr(u8)]
+// The low nibble identifies the piece and the high nibble identifies its side.
 pub enum Square {
     MyPawn = 0x01,
     MyKnight = 0x02,
@@ -30,27 +31,11 @@ pub enum Square {
 
 impl Square {
     pub fn is_my_piece(self) -> bool {
-        matches!(
-            self,
-            Square::MyPawn
-                | Square::MyKing
-                | Square::MyRook
-                | Square::MyKnight
-                | Square::MyBishop
-                | Square::MyQueen
-        )
+        matches!(self as u8, 0x01..=0x06)
     }
 
     pub fn is_opponent_piece(self) -> bool {
-        matches!(
-            self,
-            Square::OpponentPawn
-                | Square::OpponentKing
-                | Square::OpponentRook
-                | Square::OpponentKnight
-                | Square::OpponentBishop
-                | Square::OpponentQueen
-        )
+        matches!(self as u8, 0x11..=0x16)
     }
 
     pub fn swap_color(self) -> Square {
@@ -72,7 +57,7 @@ impl Square {
         }
     }
 
-    pub fn moves(self) -> &'static [i32] {
+    pub fn move_directions(self) -> &'static [i32] {
         match self {
             Square::MyPawn => &[
                 Direction::NORTH,
@@ -118,92 +103,95 @@ impl Square {
 
     pub fn midgame_value(self, position: usize) -> i32 {
         debug_assert!(
-            position >= BOARD_SIDE * PADDING + PADDING
-                && position < BOARD_SIZE - BOARD_SIDE * PADDING - PADDING
+            (BOARD_SIDE * PADDING + PADDING..BOARD_SIZE - BOARD_SIDE * PADDING - PADDING)
+                .contains(&position)
                 && position % BOARD_SIDE >= PADDING
                 && position % BOARD_SIDE < BOARD_SIDE - PADDING
         );
 
-        // Piece square tables: piece value in different positions
-        // Values from https://github.com/official-stockfish/Stockfish/blob/05f7d59a9a27d9f8bce8bde4e9fed7ecefeb03b9
-
-        // From stockfish /src/types.h#L182,
+        // Tuned piece-square tables from Sunfish.
         let piece_value = match self {
-            Square::MyPawn => 136,
-            Square::MyKnight => 782,
-            Square::MyBishop => 830,
-            Square::MyRook => 1289,
-            Square::MyQueen => 2529,
+            Square::MyPawn => 100,
+            Square::MyKnight => 280,
+            Square::MyBishop => 320,
+            Square::MyRook => 479,
+            Square::MyQueen => 929,
             Square::MyKing => 32000,
             _ => panic!(),
         };
 
-        // From stockfish /src/psqt.cpp#L31
         let piece_position_value = match self {
             Square::MyPawn => &[
                 0, 0, 0, 0, 0, 0, 0, 0, // Last rank, no pawns
-                15, 31, 20, 14, 23, 11, 37, 24, //
-                -1, -3, 15, 26, 1, 10, -7, -9, //
-                8, -1, -5, 13, 24, 11, -10, 3, //
-                -9, -18, 8, 32, 43, 25, -4, -16, //
-                -9, -13, -40, 22, 26, -40, 1, -22, //
-                2, 0, 15, 3, 11, 22, 11, -1, //
+                78, 83, 86, 73, 102, 82, 85, 90, //
+                7, 29, 21, 44, 40, 31, 44, 7, //
+                -17, 16, -2, 15, 14, 0, 15, -13, //
+                -26, 3, 10, 9, 6, 1, 0, -23, //
+                -22, 9, 5, -11, -10, -2, 3, -19, //
+                -31, 8, -7, -37, -36, -14, 3, -31, //
                 0, 0, 0, 0, 0, 0, 0, 0,
             ],
             Square::MyKnight => &[
-                -200, -80, -53, -32, -32, -53, -80, -200, //
-                -67, -21, 6, 37, 37, 6, -21, -67, //
-                -11, 28, 63, 55, 55, 63, 28, -11, //
-                -29, 13, 42, 52, 52, 42, 13, -29, //
-                -28, 5, 41, 47, 47, 41, 5, -28, //
-                -64, -20, 4, 19, 19, 4, -20, -64, //
-                -79, -39, -24, -9, -9, -24, -39, -79, //
-                -169, -96, -80, -79, -79, -80, -96, -169, //
+                -66, -53, -75, -75, -10, -55, -58, -70, //
+                -3, -6, 100, -36, 4, 62, -4, -14, //
+                10, 67, 1, 74, 73, 27, 62, -2, //
+                24, 24, 45, 37, 33, 41, 25, 17, //
+                -1, 5, 31, 21, 22, 35, 2, 0, //
+                -18, 10, 13, 22, 18, 15, 11, -14, //
+                -23, -15, 2, 0, 2, 0, -23, -20, //
+                -74, -23, -26, -24, -19, -35, -22, -69, //
             ],
             Square::MyBishop => &[
-                -48, -3, -12, -25, -25, -12, -3, -48, //
-                -21, -19, 10, -6, -6, 10, -19, -21, //
-                -17, 4, -1, 8, 8, -1, 4, -17, //
-                -7, 30, 23, 28, 28, 23, 30, -7, //
-                1, 8, 26, 37, 37, 26, 8, 1, //
-                -8, 24, -3, 15, 15, -3, 24, -8, //
-                -18, 7, 14, 3, 3, 14, 7, -18, //
-                -44, -4, -11, -28, -28, -11, -4, -44, //
+                -59, -78, -82, -76, -23, -107, -37, -50, //
+                -11, 20, 35, -42, -39, 31, 2, -22, //
+                -9, 39, -32, 41, 52, -10, 28, -14, //
+                25, 17, 20, 34, 26, 25, 15, 10, //
+                13, 10, 17, 23, 17, 16, 0, 7, //
+                14, 25, 24, 15, 8, 25, 20, 15, //
+                19, 20, 11, 6, 7, 6, 20, 16, //
+                -7, 2, -15, -12, -14, -15, -10, -10, //
             ],
             Square::MyRook => &[
-                -22, -24, -6, 4, 4, -6, -24, -22, //
-                -8, 6, 10, 12, 12, 10, 6, -8, //
-                -24, -4, 4, 10, 10, 4, -4, -24, //
-                -24, -12, -1, 6, 6, -1, -12, -24, //
-                -13, -5, -4, -6, -6, -4, -5, -13, //
-                -21, -7, 3, -1, -1, 3, -7, -21, //
-                -18, -10, -5, 9, 9, -5, -10, -18, //
-                -24, -13, -7, 2, 2, -7, -13, -24, //
+                35, 29, 33, 4, 37, 33, 56, 50, //
+                55, 29, 56, 67, 55, 62, 34, 60, //
+                19, 35, 28, 33, 45, 27, 25, 15, //
+                0, 5, 16, 13, 18, -4, -9, -6, //
+                -28, -35, -16, -21, -13, -29, -46, -30, //
+                -42, -28, -42, -25, -25, -35, -26, -46, //
+                -53, -38, -31, -26, -29, -43, -44, -53, //
+                -30, -24, -2, 5, -2, -2, -31, -32, //
             ],
             Square::MyQueen => &[
-                -2, -2, 1, -2, -2, 1, -2, -2, //
-                -5, 6, 10, 8, 8, 10, 6, -5, //
-                -4, 10, 6, 8, 8, 6, 10, -4, //
-                0, 14, 12, 5, 5, 12, 14, 0, //
-                4, 5, 9, 8, 8, 9, 5, 4, //
-                -3, 6, 13, 7, 7, 13, 6, -3, //
-                -3, 5, 8, 12, 12, 8, 5, -3, //
-                3, -5, -5, 4, 4, -5, -5, 3, //
+                6, 1, -8, -104, 69, 24, 88, 26, //
+                14, 32, 60, -10, 20, 76, 57, 24, //
+                -2, 43, 32, 60, 72, 63, 43, 2, //
+                1, -16, 22, 17, 25, 20, -13, -6, //
+                -14, -15, -2, -5, -1, -10, -20, -22, //
+                -30, -6, -13, -11, -16, -11, -16, -27, //
+                -36, -18, 0, -19, -15, -15, -21, -38, //
+                -39, -30, -31, -13, -31, -36, -34, -42, //
             ],
             Square::MyKing => &[
-                6, 8, 4, 0, 0, 4, 8, 6, //
-                8, 12, 6, 2, 2, 6, 12, 8, //
-                12, 15, 8, 3, 3, 8, 15, 12, //
-                14, 17, 11, 6, 6, 11, 17, 15, //
-                16, 19, 13, 10, 10, 13, 19, 16, //
-                19, 25, 16, 12, 12, 16, 25, 19, //
-                27, 30, 24, 18, 18, 24, 30, 27, //
-                27, 32, 27, 19, 19, 27, 32, 27, //
+                4, 54, 47, -99, -99, 60, 83, -62, //
+                -32, 10, 55, 56, 56, 55, 10, 3, //
+                -62, 12, -57, 44, -67, 28, 37, -31, //
+                -55, 50, 11, -4, -19, 13, 0, -49, //
+                -55, -43, -52, -28, -51, -47, -8, -50, //
+                -47, -42, -43, -79, -64, -32, -29, -32, //
+                -4, 3, -14, -50, -57, -18, 13, 4, //
+                17, 30, -3, -14, 6, -1, 40, 18, //
             ],
             _ => &[0; 64],
         };
         let real_position = position - PADDING * BOARD_SIDE;
         let row_number = real_position / BOARD_SIDE;
-        piece_value + piece_position_value[real_position - PADDING * (2 * row_number + 1)]
+        let square_index = real_position - PADDING * (2 * row_number + 1);
+        let knight_on_rim_penalty = if self == Square::MyKnight && matches!(square_index % 8, 0 | 7)
+        {
+            50
+        } else {
+            0
+        };
+        piece_value + piece_position_value[square_index] - knight_on_rim_penalty
     }
 }

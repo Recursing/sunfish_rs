@@ -2,12 +2,14 @@
 name = "sunfish"
 version = "0.1.0"
 authors = ["Recursing <buonanno.lorenzo@gmail.com>"]
-edition = "2018"
+edition = "2024"
+rust-version = "1.97"
 license = "GPL-3.0-only"
 
 [dependencies]
-log = "0.4"
-simplelog = "0.9"
+log = "0.4.33"
+schnellru = "0.2.4"
+simplelog = { version = "0.12.2", default-features = false }
 
 
 [profile.test]

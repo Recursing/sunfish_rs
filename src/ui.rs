@@ -1,9 +1,11 @@
-use crate::board::{rotate, static_score, BoardState, A1, A8, BOARD_SIDE, BOARD_SIZE, PADDING};
+use crate::board::{
+    A1, A8, BOARD_SIDE, BOARD_SIZE, BoardState, ChessMove, PADDING, rotate, static_score,
+};
 use crate::pieces::Square;
 
-pub fn parse_move(move_: &str) -> (usize, usize) {
-    let from = parse_coordinates(&move_[..2]);
-    let to = parse_coordinates(&move_[2..]);
+pub fn parse_move(chess_move: &str) -> ChessMove {
+    let from = parse_coordinates(&chess_move[..2]);
+    let to = parse_coordinates(&chess_move[2..]);
     (from, to)
 }
 
@@ -11,12 +13,11 @@ pub fn parse_coordinates(coordinates: &str) -> usize {
     let mut chars = coordinates.chars();
     let file = chars.next().expect("Failed to parse coordinates");
     let rank = chars.next().expect("Failed to parse coordinates");
-    A1 + (file as i32 - 'a' as i32) as usize
-        - BOARD_SIDE as usize * ((rank as i32 - '1' as i32) as usize)
+    A1 + (file as i32 - 'a' as i32) as usize - BOARD_SIDE * ((rank as i32 - '1' as i32) as usize)
 }
 
-pub fn render_move(move_: &(usize, usize)) -> String {
-    render_coordinates(move_.0) + &render_coordinates(move_.1)
+pub fn render_move(chess_move: &ChessMove) -> String {
+    render_coordinates(chess_move.0) + &render_coordinates(chess_move.1)
 }
 
 fn render_coordinates(position: usize) -> String {
@@ -60,7 +61,7 @@ pub fn render_board(board_state: &BoardState) -> String {
         for p in row.iter().skip(PADDING).take(8) {
             rendered_board.push_str(&format!(" {}", p.to_unicode()));
         }
-        rendered_board.push_str("\n");
+        rendered_board.push('\n');
     }
     rendered_board.push_str("    a b c d e f g h \n\n");
     rendered_board.push_str(&format!("Static score: {}\n", board_state.score));

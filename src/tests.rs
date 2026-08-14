@@ -1,7 +1,7 @@
 #![cfg(test)]
 
-use crate::board::{after_move, gen_moves, INITIAL_BOARD_STATE};
-use crate::search::{Searcher, MATE_LOWER};
+use crate::board::{INITIAL_BOARD_STATE, after_move, gen_moves};
+use crate::search::{MATE_LOWER, Searcher};
 use crate::ui::{from_fen, parse_move, render_board, render_move};
 use std::time::{Duration, Instant};
 
@@ -121,7 +121,7 @@ fn sicilian() {
 
 #[test]
 fn moves() {
-    let move_fens = vec![
+    let move_fens = [
         "r1b1k2r/3n1p1p/p2PpnpR/qpp1p3/5P2/2N5/PPPQB1P1/1K1R2N1 w kq - 0 16",
         "7k/7p/8/1p5R/1P6/2Pb4/1r4PK/8 w - - 1 42",
         "8/5p1p/2p1p1pk/4Q3/7P/5qP1/r4P2/2R3K1 b - - 0 34",
@@ -201,10 +201,11 @@ fn mates() {
         "3N4/p6k/b3N1pp/3pp3/R4p2/7P/P1r3PB/6K1 b - - 1 34",
         "2rR4/p4k2/1p2p2Q/5p2/5P2/8/PPP3q1/1KB4R b - - 0 27",
         "3r1r1k/1p2Nppp/p4n2/P1p1p3/4P3/6Pq/2P1NP2/R1B1QRK1 b - - 2 18",
+        "7k/pp5p/4p3/4P3/4b3/2KBqN2/6r1/3R1R2 b - - 2 37",
     ];
 
     let mate_solutions = vec![
-        "h6g7", "a6e2", "f4f6", "d3h7", "e2f1", "b6a6", "c4f7", "f7f8", "b7f7", "c3b5",
+        "h6g7", "a6e2", "f4f6", "d3h7", "e2f1", "b6a6", "c4f7", "f7f8", "b7f7", "c3b5", "d6f4",
     ];
 
     let time_for_mate = Duration::new(10, 0); // Max time to solve, should take much less N.B. compile as --release
@@ -229,6 +230,14 @@ fn mates() {
         "mates solved in {}ms, should not take more than 5000ms",
         mates_start_time.elapsed().as_millis()
     );
+}
+
+#[test]
+fn forced_mate_still_returns_a_legal_move() {
+    let mut searcher = Searcher::default();
+    let board_state = from_fen("8/8/8/8/2k1b3/6KP/6r1/R4q2 w - - 1 54");
+    let (top_move, _, _) = searcher.search(board_state, Duration::from_millis(10));
+    assert_eq!(render_move(&top_move), "g3h4");
 }
 
 #[test]

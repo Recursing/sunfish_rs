@@ -10,40 +10,84 @@ pub const H8: usize = A8 + 7;
 pub const A1: usize = A8 + 7 * BOARD_SIDE;
 const H1: usize = A1 + 7;
 
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+// A move is a pair of indexes into the padded mailbox board.
+pub type ChessMove = (usize, usize);
+
+// The board is always shown from the side to move. Its pieces are "my"
+// pieces and move north. after_move rotates the position for the next player.
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct BoardState {
     pub board: [Square; BOARD_SIZE],
     pub score: i32,
-    pub my_castling_rights: (bool, bool), // first west, second east
-    pub opponent_castling_rights: (bool, bool), // first west, second east
-    pub en_passant_position: Option<usize>, // square where I can en passant
-    pub king_passant_position: Option<usize>, // square where I could capture the king, used to treat castling as en passant
+    pub my_castling_rights: (bool, bool),       // west, east
+    pub opponent_castling_rights: (bool, bool), // west, east
+    pub en_passant_position: Option<usize>,
+    // Treat castling like en passant so crossing an attacked square is illegal.
+    pub king_passant_position: Option<usize>,
 }
 
-pub fn piece_moves(
-    board_state: &BoardState,
-    piece_moving: Square,
-    start_position: usize,
-) -> Vec<usize> {
-    let mut reachable_squares: Vec<usize> = Vec::with_capacity(20);
-    for move_direction in piece_moving.moves() {
-        for end_position in (1..).map(|k| (start_position as i32 + move_direction * k) as usize) {
-            let destination_square = board_state.board[end_position];
-            // Illegal moves
+// Generate a deterministic pseudo-random number for each Zobrist table entry.
+const fn zobrist_value(mut value: u64) -> u64 {
+    value = value.wrapping_add(0x9e3779b97f4a7c15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d049bb133111eb);
+    value ^ (value >> 31)
+}
 
-            // Hit board bounds or one of my pieces
+const PIECE_CODE_COUNT: usize = Square::OpponentKing as usize + 1;
+
+static ZOBRIST_SQUARES: [u64; BOARD_SIZE * PIECE_CODE_COUNT] = {
+    let mut values = [0; BOARD_SIZE * PIECE_CODE_COUNT];
+    let mut index = 0;
+    while index < values.len() {
+        values[index] = zobrist_value(index as u64);
+        index += 1;
+    }
+    values
+};
+
+pub fn zobrist_hash(board_state: &BoardState) -> u64 {
+    let mut hash = 0;
+    for (position, &square) in board_state.board[A8..=H1].iter().enumerate() {
+        if square.is_my_piece() || square.is_opponent_piece() {
+            hash ^= ZOBRIST_SQUARES[(position + A8) * PIECE_CODE_COUNT + square as usize];
+        }
+    }
+    let castling = board_state.my_castling_rights.0 as u64
+        | (board_state.my_castling_rights.1 as u64) << 1
+        | (board_state.opponent_castling_rights.0 as u64) << 2
+        | (board_state.opponent_castling_rights.1 as u64) << 3;
+    hash ^ zobrist_value(0x10000 | board_state.score as u32 as u64)
+        ^ zobrist_value(0x20000 | castling)
+        ^ zobrist_value(0x30000 | board_state.en_passant_position.unwrap_or(BOARD_SIZE) as u64)
+        ^ zobrist_value(0x40000 | board_state.king_passant_position.unwrap_or(BOARD_SIZE) as u64)
+}
+
+fn visit_piece_moves(
+    board_state: &BoardState,
+    moving_piece: Square,
+    start_position: usize,
+    mut visitor: impl FnMut(usize) -> bool,
+) -> bool {
+    for move_direction in moving_piece.move_directions() {
+        for step in 1.. {
+            let end_position = (start_position as i32 + move_direction * step) as usize;
+            let destination_square = board_state.board[end_position];
+
+            // The padded wall removes the need for coordinate bounds checks.
             if destination_square == Square::Wall || destination_square.is_my_piece() {
                 break;
             }
 
-            // Illegal pawn moves TODO write explanations
-            if piece_moving == Square::MyPawn {
+            if moving_piece == Square::MyPawn {
+                // Pawns move forward only into empty squares.
                 if (*move_direction == Direction::NORTH
                     || *move_direction == Direction::NORTH + Direction::NORTH)
                     && destination_square != Square::Empty
                 {
                     break;
                 }
+                // Diagonal pawn moves must capture a piece or an en passant target.
                 if (*move_direction == Direction::NORTH + Direction::WEST
                     || *move_direction == Direction::NORTH + Direction::EAST)
                     && destination_square == Square::Empty
@@ -52,6 +96,7 @@ pub fn piece_moves(
                 {
                     break;
                 }
+                // A double move starts on the second rank and cannot jump a piece.
                 if *move_direction == Direction::NORTH + Direction::NORTH
                     && (start_position < (A1 as i32 + Direction::NORTH) as usize
                         || board_state.board[(start_position as i32 + Direction::NORTH) as usize]
@@ -61,13 +106,15 @@ pub fn piece_moves(
                 }
             }
 
-            // Move is probably fine (TODO except king stuff)
-            reachable_squares.push(end_position);
+            // Emit pseudo-legal moves. The search handles king safety.
+            if visitor(end_position) {
+                return true;
+            }
 
             // Stop pieces that don't slide
-            if piece_moving == Square::MyPawn
-                || piece_moving == Square::MyKnight
-                || piece_moving == Square::MyKing
+            if moving_piece == Square::MyPawn
+                || moving_piece == Square::MyKnight
+                || moving_piece == Square::MyKing
             {
                 break;
             }
@@ -78,43 +125,42 @@ pub fn piece_moves(
             }
         }
     }
-    reachable_squares
+    false
 }
 
-pub fn gen_moves(board_state: &BoardState) -> Vec<(usize, usize)> {
-    let mut moves: Vec<(usize, usize)> = Vec::with_capacity(42);
-    for (start_position, start_square) in board_state.board.iter().enumerate() {
+pub fn gen_moves(board_state: &BoardState) -> Vec<ChessMove> {
+    let mut generated_moves = Vec::with_capacity(42);
+    for (start_position, start_square) in board_state.board[A8..=H1].iter().enumerate() {
+        let start_position = start_position + A8;
         if !start_square.is_my_piece() {
             continue;
         }
-        let piece_moving = start_square;
-        for end_position in piece_moves(board_state, *piece_moving, start_position) {
-            // Add castling if the rook can move to the king, east castling (long or short depending on color)
-            moves.push((start_position, end_position));
+        visit_piece_moves(board_state, *start_square, start_position, |end_position| {
+            generated_moves.push((start_position, end_position));
+            // A rook that can reach its king also generates the castling move.
             if start_position == A1
                 && board_state.board[(end_position as i32 + Direction::EAST) as usize]
                     == Square::MyKing
                 && board_state.my_castling_rights.0
             {
-                moves.push((
+                generated_moves.push((
                     (end_position as i32 + Direction::EAST) as usize,
                     (end_position as i32 + Direction::WEST) as usize,
                 ))
-            }
-            // Add castling if the rook can move to the king, west castling (long or short depending on color)
-            else if start_position == H1
+            } else if start_position == H1
                 && board_state.board[(end_position as i32 + Direction::WEST) as usize]
                     == Square::MyKing
                 && board_state.my_castling_rights.1
             {
-                moves.push((
+                generated_moves.push((
                     (end_position as i32 + Direction::WEST) as usize,
                     (end_position as i32 + Direction::EAST) as usize,
                 ))
             }
-        }
+            false
+        });
     }
-    moves
+    generated_moves
 }
 
 pub fn rotate(board_state: &mut BoardState) {
@@ -131,30 +177,23 @@ pub fn rotate(board_state: &mut BoardState) {
     );
     board_state.en_passant_position = board_state
         .en_passant_position
-        .map(|ep| BOARD_SIZE - 1 - ep);
+        .map(|position| BOARD_SIZE - 1 - position);
     board_state.king_passant_position = board_state
         .king_passant_position
-        .map(|kp| BOARD_SIZE - 1 - kp);
+        .map(|position| BOARD_SIZE - 1 - position);
 }
 
-// Like rotate, but clears ep and kp
+// Pass the turn without moving. En passant rights last for only one turn.
 pub fn nullmove(board_state: &BoardState) -> BoardState {
-    let mut new_board = [Square::Empty; BOARD_SIZE];
-    for (coordinate, square) in new_board.iter_mut().enumerate() {
-        *square = board_state.board[BOARD_SIZE - 1 - coordinate].swap_color();
-    }
-    BoardState {
-        board: new_board,
-        score: -board_state.score,
-        my_castling_rights: board_state.opponent_castling_rights,
-        opponent_castling_rights: board_state.my_castling_rights,
-        en_passant_position: None,
-        king_passant_position: None,
-    }
+    let mut new_board_state = *board_state;
+    rotate(&mut new_board_state);
+    new_board_state.en_passant_position = None;
+    new_board_state.king_passant_position = None;
+    new_board_state
 }
 
-pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardState {
-    let (start_position, end_position) = *move_;
+pub fn after_move(board_state: &BoardState, chess_move: &ChessMove) -> BoardState {
+    let (start_position, end_position) = *chess_move;
     let start_square = board_state.board[start_position];
     let mut new_board = board_state.board;
     let mut my_castling_rights = board_state.my_castling_rights;
@@ -197,14 +236,14 @@ pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardStat
 
     // Pawn promotion, double move and en passant capture
     if start_square == Square::MyPawn {
-        let move_type = end_position as i32 - start_position as i32;
-        if (A8 <= end_position) && (end_position <= H8) {
+        let displacement = end_position as i32 - start_position as i32;
+        if (A8..=H8).contains(&end_position) {
             new_board[end_position] = Square::MyQueen
-        } else if move_type == 2 * Direction::NORTH {
+        } else if displacement == 2 * Direction::NORTH {
             en_passant_position = Some((start_position as i32 + Direction::NORTH) as usize)
         }
 
-        // en passant capture (diagonal move to empty position)
+        // An en passant capture moves diagonally to an empty square.
         if board_state.en_passant_position == Some(end_position) {
             new_board[end_position + Direction::SOUTH as usize] = Square::Empty;
         }
@@ -212,7 +251,7 @@ pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardStat
 
     let mut new_board_state = BoardState {
         board: new_board,
-        score: board_state.score + move_value(board_state, &move_),
+        score: board_state.score + move_value(board_state, chess_move),
         my_castling_rights,
         opponent_castling_rights,
         king_passant_position,
@@ -222,79 +261,71 @@ pub fn after_move(board_state: &BoardState, move_: &(usize, usize)) -> BoardStat
     new_board_state
 }
 
-pub fn can_check(board_state: &BoardState, move_: &(usize, usize)) -> bool {
-    let (start_position, end_position) = *move_;
-    let moved_piece = board_state.board[start_position];
-    if !moved_piece.is_my_piece() {
-        panic!();
-    }
-    for reachable_square in piece_moves(board_state, moved_piece, end_position) {
-        if board_state.board[reachable_square] == Square::OpponentKing {
-            return true;
-        }
-    }
-    false
-}
-
-pub fn move_value(board_state: &BoardState, move_: &(usize, usize)) -> i32 {
-    let (start_position, end_position) = *move_;
+pub fn move_value(board_state: &BoardState, chess_move: &ChessMove) -> i32 {
+    let (start_position, end_position) = *chess_move;
     let moving_piece = board_state.board[start_position];
     if !moving_piece.is_my_piece() {
         panic!();
     }
 
     // Actual move
-    let mut temp_score =
+    let mut score_delta =
         moving_piece.midgame_value(end_position) - moving_piece.midgame_value(start_position);
 
     // Score for captures
     if board_state.board[end_position].is_opponent_piece() {
         // Add to the board score the value of the captured piece in the rotated board
-        temp_score += board_state.board[end_position]
+        score_delta += board_state.board[end_position]
             .swap_color()
             .midgame_value(BOARD_SIZE - 1 - end_position);
     }
 
     // Castling check detection
-    match board_state.king_passant_position {
-        None => {}
-        Some(position) => {
-            // If I'm moving to a position the opponent king just passed through while castling, I can capture it
-            // E.g. any of E1, F1, G1 for white short castling, the king_passant_position would be F1
-            if (end_position as i32 - position as i32).abs() < 2 {
-                temp_score += Square::MyKing.midgame_value(BOARD_SIZE - 1 - end_position);
-            }
-        }
+    if let Some(position) = board_state.king_passant_position
+        && (end_position as i32 - position as i32).abs() < 2
+    {
+        // If I'm moving to a position the opponent king just passed through while castling, I can capture it
+        // E.g. any of E1, F1, G1 for white short castling, the king_passant_position would be F1
+        score_delta += Square::MyKing.midgame_value(BOARD_SIZE - 1 - end_position);
     }
 
-    // Wierd pawn and king stuff (castling, promotions and en passant)
+    // Score the special effects of king and pawn moves.
     match moving_piece {
         Square::MyKing => {
             // Castling, update the score with the new rook position
             if (end_position as i32 - start_position as i32).abs() == 2 {
-                temp_score += Square::MyRook.midgame_value((start_position + end_position) / 2);
-                temp_score -= Square::MyRook.midgame_value(if end_position < start_position {
+                score_delta += Square::MyRook.midgame_value((start_position + end_position) / 2);
+                score_delta -= Square::MyRook.midgame_value(if end_position < start_position {
                     A1
                 } else {
                     H1
                 });
+            } else if board_state.my_castling_rights.0 || board_state.my_castling_rights.1 {
+                score_delta -= 70;
             }
         }
         Square::MyPawn => {
-            if A8 <= end_position && end_position <= H8 {
+            let second_rank = A1 - BOARD_SIDE;
+            let opens_king = (board_state.board[A1 + 6] == Square::MyKing
+                && (second_rank + 5..=second_rank + 7).contains(&start_position))
+                || (board_state.board[A1 + 2] == Square::MyKing
+                    && (second_rank..=second_rank + 2).contains(&start_position));
+            if opens_king {
+                score_delta -= 40;
+            }
+            if (A8..=H8).contains(&end_position) {
                 //Promotion
-                temp_score += Square::MyQueen.midgame_value(end_position)
+                score_delta += Square::MyQueen.midgame_value(end_position)
                     - Square::MyPawn.midgame_value(end_position) //Always promote to queen
             } else if board_state.en_passant_position == Some(end_position) {
-                //Capture a pawn en passant
-                // TODO explain
-                temp_score +=
+                // The captured pawn sits one rank behind the destination.
+                score_delta +=
                     Square::MyPawn.midgame_value(BOARD_SIZE - 1 - (end_position + BOARD_SIDE))
             }
         }
         _ => {}
     }
-    temp_score
+    score_delta
 }
 
 pub fn static_score(board: [Square; BOARD_SIZE]) -> i32 {
@@ -472,7 +503,7 @@ const INITIAL_BOARD: [Square; BOARD_SIZE] = [
 
 pub const INITIAL_BOARD_STATE: BoardState = BoardState {
     board: INITIAL_BOARD,
-    score: 0,
+    score: 38,
     my_castling_rights: (true, true),
     opponent_castling_rights: (true, true),
     en_passant_position: None,
